@@ -1,0 +1,105 @@
+<div class="page home-page">
+  <section class="hero" aria-labelledby="welcome-title">
+    <div>
+      <p class="eyebrow">Your private contact space</p>
+      <h1 id="welcome-title">Good to see you.</h1>
+      <p>Everything stays encrypted on this device.</p>
+    </div>
+    <span class="privacy-mark" aria-hidden="true"><app-icon name="shield" /></span>
+  </section>
+
+  <a class="search-card" routerLink="/contacts">
+    <app-icon name="search" />
+    <span>Search contacts, numbers and notes</span>
+  </a>
+
+  <div class="section-title">
+    <h2>Quick actions</h2>
+    <button class="text-link" type="button" (click)="store.quickActionsOpen.set(true)">
+      View all
+    </button>
+  </div>
+  <section class="quick-grid" aria-label="Quick actions">
+    <a routerLink="/whatsapp" class="quick-card whatsapp">
+      <span><app-icon name="message" /></span>
+      <strong>WhatsApp</strong>
+      <small>Chat without saving</small>
+    </a>
+    <a routerLink="/contacts" [queryParams]="{ add: 1 }" class="quick-card contact">
+      <span><app-icon name="user-plus" /></span>
+      <strong>Add contact</strong>
+      <small>Private address book</small>
+    </a>
+    <a href="tel:" class="quick-card call">
+      <span><app-icon name="phone" /></span>
+      <strong>Make a call</strong>
+      <small>Open the dialler</small>
+    </a>
+    <a routerLink="/messages" [queryParams]="{ add: 1 }" class="quick-card saved">
+      <span><app-icon name="bookmark-plus" /></span>
+      <strong>Save message</strong>
+      <small>Keep a code or note</small>
+    </a>
+  </section>
+
+  <div class="section-title">
+    <h2>Recent contacts</h2>
+    <a class="text-link" routerLink="/contacts">See all</a>
+  </div>
+  <section class="card contact-list" aria-label="Recent contacts">
+    @if (store.loading()) {
+      <div class="loading-row">
+        <span></span>
+        <div><i></i><i></i></div>
+      </div>
+      <div class="loading-row">
+        <span></span>
+        <div><i></i><i></i></div>
+      </div>
+    } @else if (store.recentContacts().length) {
+      @for (contact of store.recentContacts(); track contact.id) {
+        <article class="contact-row">
+          <span class="avatar">{{ contact.name.slice(0, 1).toUpperCase() }}</span>
+          <span class="contact-copy">
+            <strong>{{ displayName(contact) }}</strong>
+            <small>{{ contact.company || '+91 ' + formatPhone(contact.phone) }}</small>
+          </span>
+          <a
+            [href]="'tel:' + contact.normalizedPhone"
+            [attr.aria-label]="'Call ' + displayName(contact)"
+          >
+            <app-icon name="phone" />
+          </a>
+        </article>
+      }
+    } @else {
+      <div class="empty-state compact">
+        <span class="empty-icon"><app-icon name="contacts" /></span>
+        <h3>No private contacts yet</h3>
+        <p>Add someone here without saving them to Android Contacts.</p>
+        <a class="primary-button" routerLink="/contacts" [queryParams]="{ add: 1 }">
+          <app-icon name="user-plus" /> Add your first contact
+        </a>
+      </div>
+    }
+  </section>
+
+  <div class="section-title">
+    <h2>Recent activity</h2>
+    <a class="text-link" routerLink="/tagged">Tagged numbers</a>
+  </div>
+  <section class="card activity-card">
+    <span class="activity-icon"><app-icon name="offline" /></span>
+    <div>
+      <strong>Permission-free by design</strong>
+      <p>
+        Calls and chats opened from Who Called? will appear here. Device call history is optional.
+      </p>
+    </div>
+  </section>
+
+  <section class="privacy-note">
+    <app-icon name="lock" />
+    <span><strong>Offline & encrypted</strong>Your contact data is never uploaded.</span>
+  </section>
+</div>

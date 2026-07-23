@@ -1,0 +1,131 @@
+<div class="page messages-page">
+  <header class="page-heading heading-row">
+    <div>
+      <h1>Saved messages</h1>
+      <p>Keep OTPs, delivery codes and references easy to find.</p>
+    </div>
+    <button class="primary-button add-button" type="button" (click)="openEditor()">
+      <app-icon name="bookmark-plus" /><span>Save</span>
+    </button>
+  </header>
+
+  <section class="info-card">
+    <app-icon name="lock" />
+    <p>
+      <strong>Encrypted on this device</strong
+      ><small>Who Called? never reads your SMS inbox. You choose what to save.</small>
+    </p>
+  </section>
+
+  @if (store.messages().length) {
+    <section class="message-stack" aria-label="Saved messages">
+      @for (message of store.messages(); track message.id) {
+        <article class="card message-card">
+          <header>
+            <span class="category">{{ message.category }}</span>
+            <button
+              type="button"
+              [attr.aria-label]="'Delete ' + message.title"
+              (click)="remove(message.id, message.title)"
+            >
+              <app-icon name="trash" />
+            </button>
+          </header>
+          <h2>{{ message.title }}</h2>
+          <p>{{ message.message }}</p>
+          @if (message.detectedCode) {
+            <button class="code-pill" type="button" (click)="copy(message.detectedCode)">
+              <span
+                ><small>Detected code</small><strong>{{ message.detectedCode }}</strong></span
+              >
+              <app-icon [name]="copied() === message.detectedCode ? 'check' : 'copy'" />
+            </button>
+          }
+          <footer>
+            <small>{{ message.sender || 'Manual entry' }}</small>
+            <button class="text-link" type="button" (click)="copy(message.message)">
+              Copy message
+            </button>
+          </footer>
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="card empty-state">
+      <span class="empty-icon"><app-icon name="bookmark" /></span>
+      <h3>Nothing saved yet</h3>
+      <p>Paste a useful message, booking reference, delivery code, or temporary note.</p>
+      <button class="primary-button" type="button" (click)="openEditor()">
+        <app-icon name="bookmark-plus" /> Save a message
+      </button>
+    </section>
+  }
+</div>
+
+@if (editorOpen()) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close saved message editor"
+    (click)="closeEditor()"
+  ></button>
+  <section class="editor" role="dialog" aria-modal="true" aria-labelledby="message-editor-title">
+    <header>
+      <div>
+        <p>Important information</p>
+        <h2 id="message-editor-title">Save a message</h2>
+      </div>
+      <button type="button" aria-label="Close" (click)="closeEditor()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="field">
+        <label for="message-title">Title</label>
+        <input id="message-title" formControlName="title" placeholder="e.g. LPG delivery OTP" />
+      </div>
+      <div class="field">
+        <label for="message-category">Category</label>
+        <app-select-picker
+          [value]="form.controls.category.value"
+          [options]="categories"
+          sheetTitle="Message category"
+          (valueChange)="form.controls.category.setValue($event)"
+        />
+      </div>
+      <div class="field">
+        <span class="label-row"
+          ><label for="message-text">Message text</label
+          ><button type="button" (click)="pasteMessage()">Paste</button></span
+        >
+        <textarea
+          id="message-text"
+          formControlName="message"
+          placeholder="Paste or type the message here"
+        ></textarea>
+      </div>
+      @if (detectedCode()) {
+        <div class="detected">
+          <span
+            ><small>Detected code</small><strong>{{ detectedCode() }}</strong></span
+          >
+          <app-icon name="check" />
+        </div>
+      }
+      <div class="field">
+        <label for="message-sender">Sender <span>(optional)</span></label>
+        <input id="message-sender" formControlName="sender" placeholder="Name or phone number" />
+      </div>
+      <label class="toggle-row">
+        <span><strong>Mark as favourite</strong><small>Keep this message near the top</small></span>
+        <input type="checkbox" formControlName="favorite" />
+      </label>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" (click)="closeEditor()">Cancel</button>
+        <button class="primary-button" type="submit">
+          <app-icon name="check" /> Encrypt & save
+        </button>
+      </div>
+    </form>
+  </section>
+}

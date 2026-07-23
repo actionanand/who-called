@@ -1,0 +1,523 @@
+<div class="page contacts-page">
+  <header class="page-heading heading-row">
+    <div>
+      <h1>Private contacts</h1>
+      <p>Separate from your Android address book.</p>
+    </div>
+    <button class="primary-button add-button" type="button" (click)="openEditor()">
+      <app-icon name="user-plus" /> <span>Add</span>
+    </button>
+  </header>
+
+  <label class="search-box">
+    <span class="visually-hidden">Search private contacts</span>
+    <app-icon name="search" />
+    <input
+      #searchInput
+      type="search"
+      placeholder="Search name, number, email or note"
+      (input)="search.set(searchInput.value)"
+    />
+  </label>
+
+  <div class="filter-row" aria-label="Contact filters">
+    <button class="active" type="button">All</button>
+    <button type="button">Favourites</button>
+    <button type="button">WhatsApp</button>
+    <button type="button">Has notes</button>
+  </div>
+
+  @if (store.loading()) {
+    <p class="status">Opening your encrypted contacts…</p>
+  } @else if (filteredContacts().length) {
+    <section class="contact-stack" aria-label="Contacts">
+      @for (contact of filteredContacts(); track contact.id) {
+        <article class="contact-card card">
+          <button
+            class="avatar"
+            type="button"
+            [attr.aria-label]="'View details for ' + displayName(contact)"
+            (click)="openContactDetails(contact)"
+          >
+            {{ contact.name.slice(0, 1).toUpperCase() }}
+          </button>
+          <div class="copy">
+            <span class="name-line">
+              <strong>{{ displayName(contact) }}</strong>
+              @if (contact.favorite) {
+                <app-icon name="favorite" />
+              }
+              @if (contact.hidden) {
+                <button
+                  class="name-reveal-button"
+                  type="button"
+                  aria-label="Show hidden contact name for 5 seconds"
+                  (click)="revealHiddenName(contact)"
+                >
+                  <app-icon [name]="revealedNames().has(contact.id) ? 'eye' : 'eye-off'" />
+                </button>
+              }
+            </span>
+            <small>{{ contact.company || '+91 ' + formatPhone(contact.phone) }}</small>
+            @if (age(contact); as currentAge) {
+              <span class="age"><app-icon name="birthday" /> {{ currentAge }} years old</span>
+            }
+            @if (contact.notes) {
+              <p>{{ contact.notes }}</p>
+            }
+          </div>
+          <div class="row-actions">
+            @if (whatsappPhones(contact).length) {
+              <button
+                type="button"
+                [attr.aria-label]="'Open WhatsApp chat with ' + displayName(contact)"
+                (click)="openPhoneAction(contact, 'whatsapp')"
+              >
+                <app-icon name="message" />
+              </button>
+            }
+            <button
+              type="button"
+              [attr.aria-label]="'Call ' + displayName(contact)"
+              (click)="openPhoneAction(contact, 'call')"
+            >
+              <app-icon name="phone" />
+            </button>
+            <button
+              type="button"
+              [attr.aria-label]="'Edit ' + displayName(contact)"
+              (click)="openEditor(contact)"
+            >
+              <app-icon name="edit" />
+            </button>
+            <button
+              type="button"
+              [attr.aria-label]="'Delete ' + displayName(contact)"
+              (click)="remove(contact.id, displayName(contact))"
+            >
+              <app-icon name="trash" />
+            </button>
+          </div>
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="card empty-state">
+      <span class="empty-icon"><app-icon name="contacts" /></span>
+      <h3>{{ search() ? 'No matching contacts' : 'Your private list is empty' }}</h3>
+      <p>
+        {{
+          search()
+            ? 'Try a name, email, social profile, note, or part of a phone number.'
+            : 'Contacts saved here do not appear in Android Contacts.'
+        }}
+      </p>
+      @if (!search()) {
+        <button class="primary-button" type="button" (click)="openEditor()">
+          <app-icon name="user-plus" /> Add contact
+        </button>
+      }
+    </section>
+  }
+</div>
+
+@if (editorOpen()) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close contact editor"
+    (click)="closeEditor()"
+  ></button>
+  <section class="editor" role="dialog" aria-modal="true" aria-labelledby="contact-editor-title">
+    <header>
+      <div>
+        <p>Private contact</p>
+        <h2 id="contact-editor-title">{{ editingContact() ? 'Edit contact' : 'Add a contact' }}</h2>
+      </div>
+      <div class="header-actions">
+        <button
+          class="favorite-button"
+          type="button"
+          [class.selected]="form.controls.favorite.value"
+          [attr.aria-pressed]="form.controls.favorite.value"
+          aria-label="Toggle favourite"
+          (click)="toggleFavorite()"
+        >
+          <app-icon name="favorite" />
+        </button>
+        <button
+          class="visibility-button"
+          type="button"
+          [class.selected]="form.controls.hidden.value"
+          [attr.aria-pressed]="form.controls.hidden.value"
+          [attr.aria-label]="form.controls.hidden.value ? 'Unhide contact' : 'Hide contact'"
+          (click)="toggleHidden()"
+        >
+          <app-icon [name]="form.controls.hidden.value ? 'eye-off' : 'eye'" />
+        </button>
+        <button type="button" aria-label="Close" (click)="closeEditor()">
+          <app-icon name="close" />
+        </button>
+      </div>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="avatar-picker" aria-hidden="true"><app-icon name="user-plus" /></div>
+
+      <div class="field">
+        <label for="contact-name">Contact name</label>
+        <input
+          id="contact-name"
+          formControlName="name"
+          autocomplete="name"
+          placeholder="e.g. Anand Kumar"
+        />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <small class="error">Enter a contact name.</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="contact-company">Company <span>(optional)</span></label>
+        <input
+          id="contact-company"
+          formControlName="company"
+          autocomplete="organization"
+          placeholder="Company or organisation"
+        />
+      </div>
+
+      <fieldset formArrayName="phones" class="repeat-group">
+        <legend>Phone numbers</legend>
+        @for (phone of phones.controls; track phone.controls.id.value; let index = $index) {
+          <div class="repeat-card" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Phone {{ index + 1 }}</strong>
+              @if (phones.length > 1) {
+                <button type="button" aria-label="Remove phone number" (click)="removePhone(index)">
+                  <app-icon name="close" />
+                </button>
+              }
+            </div>
+            <div class="field">
+              <span class="field-label">Type</span>
+              <app-select-picker
+                [value]="phone.controls.type.value"
+                [options]="phoneTypes"
+                sheetTitle="Phone number type"
+                (valueChange)="setPickerValue(phone.controls.type, $event)"
+              />
+            </div>
+            <div class="phone-grid">
+              <div class="field code-field">
+                <label [for]="'calling-code-' + index">Code</label>
+                <input
+                  [id]="'calling-code-' + index"
+                  formControlName="callingCode"
+                  inputmode="tel"
+                />
+              </div>
+              <div class="field">
+                <label [for]="'contact-phone-' + index">Number</label>
+                <input
+                  [id]="'contact-phone-' + index"
+                  formControlName="number"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel-national"
+                  placeholder="98765 43210"
+                />
+              </div>
+            </div>
+            <label class="inline-check">
+              <input type="checkbox" formControlName="whatsappEnabled" />
+              <span>This number uses WhatsApp</span>
+            </label>
+          </div>
+        }
+        <button class="add-field-button" type="button" (click)="addPhone()">
+          <app-icon name="plus" /> Add phone number
+        </button>
+      </fieldset>
+
+      <fieldset formArrayName="emails" class="repeat-group">
+        <legend>Email addresses</legend>
+        @for (email of emails.controls; track email.controls.id.value; let index = $index) {
+          <div class="repeat-card compact" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Email {{ index + 1 }}</strong>
+              <button type="button" aria-label="Remove email address" (click)="removeEmail(index)">
+                <app-icon name="close" />
+              </button>
+            </div>
+            <div class="two-column">
+              <app-select-picker
+                [value]="email.controls.type.value"
+                [options]="emailTypes"
+                sheetTitle="Email type"
+                (valueChange)="setPickerValue(email.controls.type, $event)"
+              />
+              <div class="field">
+                <label class="visually-hidden" [for]="'contact-email-' + index"
+                  >Email address</label
+                >
+                <input
+                  [id]="'contact-email-' + index"
+                  formControlName="value"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="name@example.com"
+                />
+              </div>
+            </div>
+          </div>
+        }
+        <button class="add-field-button" type="button" (click)="addEmail()">
+          <app-icon name="plus" /> Add email
+        </button>
+      </fieldset>
+
+      <fieldset formArrayName="socialLinks" class="repeat-group">
+        <legend>Social media & websites</legend>
+        @for (link of socialLinks.controls; track link.controls.id.value; let index = $index) {
+          <div class="repeat-card compact" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Link {{ index + 1 }}</strong>
+              <button
+                type="button"
+                aria-label="Remove social media link"
+                (click)="removeSocial(index)"
+              >
+                <app-icon name="close" />
+              </button>
+            </div>
+            <app-select-picker
+              [value]="link.controls.platform.value"
+              [options]="socialTypes"
+              sheetTitle="Social platform"
+              (valueChange)="setPickerValue(link.controls.platform, $event)"
+            />
+            <div class="field">
+              <label class="visually-hidden" [for]="'social-url-' + index">Profile URL</label>
+              <input
+                [id]="'social-url-' + index"
+                formControlName="url"
+                type="url"
+                inputmode="url"
+                placeholder="https://…"
+              />
+            </div>
+          </div>
+        }
+        <button class="add-field-button" type="button" (click)="addSocial()">
+          <app-icon name="plus" /> Add social link
+        </button>
+      </fieldset>
+
+      <fieldset class="repeat-group birthday-group">
+        <legend>Date of birth</legend>
+        <app-select-picker
+          [value]="form.controls.dobMode.value"
+          [options]="dobModes"
+          sheetTitle="Date of birth format"
+          (valueChange)="setPickerValue(form.controls.dobMode, $event)"
+        />
+        @if (form.controls.dobMode.value === 'month-day') {
+          <div class="two-column">
+            <div class="field">
+              <label for="dob-month">Month</label>
+              <input
+                id="dob-month"
+                formControlName="dobMonth"
+                type="number"
+                min="1"
+                max="12"
+                inputmode="numeric"
+              />
+            </div>
+            <div class="field">
+              <label for="dob-day">Day</label>
+              <input
+                id="dob-day"
+                formControlName="dobDay"
+                type="number"
+                min="1"
+                max="31"
+                inputmode="numeric"
+              />
+            </div>
+          </div>
+        } @else if (form.controls.dobMode.value === 'full') {
+          <div class="field">
+            <label for="dob-full">Full date of birth</label>
+            <input id="dob-full" formControlName="dobFull" type="date" />
+            <small>The current age appears below the contact preview.</small>
+          </div>
+        }
+      </fieldset>
+
+      <div class="field">
+        <label for="contact-notes">Private note <span>(optional)</span></label>
+        <textarea
+          id="contact-notes"
+          formControlName="notes"
+          placeholder="How you know this person, follow-up details…"
+        ></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button class="secondary-button" type="button" (click)="closeEditor()">Cancel</button>
+        <button class="primary-button" type="submit" [disabled]="saving()">
+          <app-icon name="check" />
+          {{ saving() ? 'Encrypting…' : editingContact() ? 'Update contact' : 'Save contact' }}
+        </button>
+      </div>
+    </form>
+  </section>
+}
+
+@if (phoneChoice(); as choice) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close phone number chooser"
+    (click)="closePhoneChoice()"
+  ></button>
+  <section
+    class="choice-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="phone-choice-title"
+  >
+    <header>
+      <div>
+        <p>{{ choice.mode === 'whatsapp' ? 'WhatsApp' : 'Phone call' }}</p>
+        <h2 id="phone-choice-title">Choose number</h2>
+      </div>
+      <button type="button" aria-label="Close" (click)="closePhoneChoice()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <div class="choice-list">
+      @for (phone of choice.phones; track phone.id) {
+        <button type="button" (click)="choosePhone(phone)">
+          <span>
+            <strong>{{ phone.type }}</strong>
+            <small>{{ phoneLabel(phone) }}</small>
+          </span>
+          <app-icon [name]="choice.mode === 'whatsapp' ? 'message' : 'phone'" />
+        </button>
+      }
+    </div>
+  </section>
+}
+
+@if (selectedContact(); as contact) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close contact details"
+    (click)="closeContactDetails()"
+  ></button>
+  <section
+    class="details-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="contact-details-title"
+  >
+    <header>
+      <span class="details-avatar" aria-hidden="true">{{
+        contact.name.slice(0, 1).toUpperCase()
+      }}</span>
+      <div>
+        <p>Contact details</p>
+        <h2 id="contact-details-title">{{ displayName(contact) }}</h2>
+        @if (contact.company) {
+          <small>{{ contact.company }}</small>
+        }
+      </div>
+      <button type="button" aria-label="Close" (click)="closeContactDetails()">
+        <app-icon name="close" />
+      </button>
+    </header>
+
+    <div class="details-content">
+      <section class="details-section">
+        <h3>Phone numbers</h3>
+        @for (phone of contactPhones(contact); track phone.id) {
+          <div class="detail-row">
+            <app-icon name="phone" />
+            <span>
+              <strong>{{ phone.type }}</strong>
+              <small>{{ phoneLabel(phone) }}</small>
+            </span>
+            @if (phone.whatsappEnabled) {
+              <app-icon name="message" />
+            }
+          </div>
+        }
+      </section>
+
+      @if (contact.emails?.length) {
+        <section class="details-section">
+          <h3>Email addresses</h3>
+          @for (email of contact.emails; track email.id) {
+            <a class="detail-row link-row" [href]="'mailto:' + email.value">
+              <app-icon name="email" />
+              <span>
+                <strong>{{ email.type }}</strong>
+                <small>{{ email.value }}</small>
+              </span>
+              <app-icon name="chevron" />
+            </a>
+          }
+        </section>
+      }
+
+      @if (contact.socialLinks?.length) {
+        <section class="details-section">
+          <h3>Social media & websites</h3>
+          @for (link of contact.socialLinks; track link.id) {
+            <a class="detail-row link-row" [href]="link.url" target="_blank" rel="noopener">
+              <app-icon name="globe" />
+              <span>
+                <strong>{{ link.platform }}</strong>
+                <small>{{ link.url }}</small>
+              </span>
+              <app-icon name="chevron" />
+            </a>
+          }
+        </section>
+      }
+
+      @if (contact.birthDate) {
+        <section class="details-section">
+          <h3>Date of birth</h3>
+          <div class="detail-row">
+            <app-icon name="birthday" />
+            <span>
+              <strong>{{ birthdayLabel(contact) }}</strong>
+              <small>{{ birthdayDetail(contact) }}</small>
+            </span>
+          </div>
+        </section>
+      }
+
+      @if (contact.notes) {
+        <section class="details-section">
+          <h3>Private note</h3>
+          <p class="details-note">{{ contact.notes }}</p>
+        </section>
+      }
+
+      <div class="details-actions">
+        <button class="secondary-button" type="button" (click)="editContact(contact)">
+          <app-icon name="edit" /> Edit
+        </button>
+        <button class="primary-button" type="button" (click)="openPhoneAction(contact, 'call')">
+          <app-icon name="phone" /> Call
+        </button>
+      </div>
+    </div>
+  </section>
+}

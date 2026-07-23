@@ -1,0 +1,183 @@
+import { computed, inject, Injectable, signal } from '@angular/core';
+import {
+  AppSettings,
+  PrivateContact,
+  SavedMessage,
+  TaggedNumber,
+  ThemePreference,
+} from '../models/app.models';
+import { LOCAL_RECORD_REPOSITORY } from '../repositories/repository.contracts';
+import { ThemeService } from './theme.service';
+import { NativeIntegrationService } from './native-integration.service';
+
+const DEFAULT_SETTINGS: AppSettings & { readonly id: string } = {
+  id: 'primary',
+  theme: 'automatic',
+  defaultCountry: 'India',
+  defaultCallingCode: '+91',
+  recentActivityEnabled: true,
+  whatsappBusinessFallback: true,
+  deviceCallHistoryEnabled: false,
+  screenshotProtection: true,
+  pinEnabled: false,
+  biometricEnabled: false,
+  hideHiddenContacts: true,
+};
+
+@Injectable({ providedIn: 'root' })
+export class AppStore {
+  private readonly database = inject(LOCAL_RECORD_REPOSITORY);
+  private readonly themeService = inject(ThemeService);
+  private readonly native = inject(NativeIntegrationService);
+
+  readonly contacts = signal<readonly PrivateContact[]>([]);
+  readonly messages = signal<readonly SavedMessage[]>([]);
+  readonly taggedNumbers = signal<readonly TaggedNumber[]>([]);
+  readonly settings = signal<AppSettings>(DEFAULT_SETTINGS);
+  readonly loading = signal(true);
+  readonly storageError = signal(false);
+  readonly pendingSharedText = signal('');
+  readonly pendingContactDraft = signal<{
+    readonly taggedNumberId: string;
+    readonly phone: string;
+    readonly note: string;
+    readonly tag: string;
+  } | null>(null);
+  readonly quickActionsOpen = signal(false);
+  readonly locked = signal(false);
+  readonly visibleContacts = computed(() =>
+    this.settings().hideHiddenContacts
+      ? this.contacts().filter((contact) => !contact.hidden)
+      : this.contacts(),
+  );
+  readonly favoriteContacts = computed(() =>
+    this.visibleContacts().filter((contact) => contact.favorite),
+  );
+  readonly recentContacts = computed(() =>
+    [...this.visibleContacts()]
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, 4),
+  );
+
+  constructor() {
+    void this.initialize();
+  }
+
+  async addContact(contact: PrivateContact): Promise<void> {
+    await this.database.put('contact', contact);
+    this.contacts.update((contacts) => [contact, ...contacts]);
+  }
+
+  async updateContact(contact: PrivateContact): Promise<void> {
+    await this.database.put('contact', contact);
+    this.contacts.update((contacts) =>
+      contacts.map((existing) => (existing.id === contact.id ? contact : existing)),
+    );
+  }
+
+  async removeContact(id: string): Promise<void> {
+    await this.database.remove('contact', id);
+    this.contacts.update((contacts) => contacts.filter((contact) => contact.id !== id));
+  }
+
+  async addMessage(message: SavedMessage): Promise<void> {
+    await this.database.put('message', message);
+    this.messages.update((messages) => [message, ...messages]);
+  }
+
+  async removeMessage(id: string): Promise<void> {
+    await this.database.remove('message', id);
+    this.messages.update((messages) => messages.filter((message) => message.id !== id));
+  }
+
+  async addTaggedNumber(taggedNumber: TaggedNumber): Promise<void> {
+    await this.database.put('tagged-number', taggedNumber);
+    this.taggedNumbers.update((numbers) => [taggedNumber, ...numbers]);
+  }
+
+  async updateTaggedNumber(taggedNumber: TaggedNumber): Promise<void> {
+    await this.database.put('tagged-number', taggedNumber);
+    this.taggedNumbers.update((numbers) =>
+      numbers.map((number) => (number.id === taggedNumber.id ? taggedNumber : number)),
+    );
+  }
+
+  async removeTaggedNumber(id: string): Promise<void> {
+    await this.database.remove('tagged-number', id);
+    this.taggedNumbers.update((numbers) => numbers.filter((number) => number.id !== id));
+  }
+
+  async setTheme(theme: ThemePreference): Promise<void> {
+    await this.updateSettings({ theme });
+    this.themeService.apply(theme);
+  }
+
+  async updateSettings(changes: Partial<AppSettings>): Promise<void> {
+    const settings = { ...this.settings(), ...changes };
+    this.settings.set(settings);
+    await this.database.put('settings', { id: 'primary', ...settings });
+  }
+
+  async replaceData(snapshot: {
+    readonly contacts: readonly PrivateContact[];
+    readonly messages: readonly SavedMessage[];
+    readonly taggedNumbers: readonly TaggedNumber[];
+    readonly settings?: Partial<AppSettings>;
+  }): Promise<void> {
+    await Promise.all([
+      this.database.clear('contact'),
+      this.database.clear('message'),
+      this.database.clear('tagged-number'),
+    ]);
+    await Promise.all([
+      ...snapshot.contacts.map((contact) => this.database.put('contact', contact)),
+      ...snapshot.messages.map((message) => this.database.put('message', message)),
+      ...snapshot.taggedNumbers.map((number) => this.database.put('tagged-number', number)),
+    ]);
+    this.contacts.set(snapshot.contacts);
+    this.messages.set(snapshot.messages);
+    this.taggedNumbers.set(snapshot.taggedNumbers);
+    if (snapshot.settings) await this.updateSettings(snapshot.settings);
+  }
+
+  async unlockSensitiveData(): Promise<void> {
+    const [contacts, messages, taggedNumbers] = await Promise.all([
+      this.database.list<PrivateContact>('contact'),
+      this.database.list<SavedMessage>('message'),
+      this.database.list<TaggedNumber>('tagged-number'),
+    ]);
+    this.contacts.set(contacts);
+    this.messages.set(messages);
+    this.taggedNumbers.set(taggedNumbers);
+    this.locked.set(false);
+  }
+
+  lockAndClear(): void {
+    this.contacts.set([]);
+    this.messages.set([]);
+    this.taggedNumbers.set([]);
+    this.locked.set(true);
+  }
+
+  private async initialize(): Promise<void> {
+    try {
+      const settings = await this.database.list<AppSettings & { readonly id: string }>('settings');
+      this.settings.set({ ...DEFAULT_SETTINGS, ...(settings[0] ?? {}) });
+      this.themeService.apply(this.settings().theme);
+      this.native.setScreenshotProtection(this.settings().screenshotProtection);
+      if (this.settings().pinEnabled) this.locked.set(true);
+      else await this.unlockSensitiveData();
+    } catch {
+      this.storageError.set(true);
+    } finally {
+      this.loading.set(false);
+      const schedule =
+        globalThis.requestAnimationFrame ??
+        ((callback: FrameRequestCallback) => {
+          callback(0);
+          return 0;
+        });
+      schedule(() => this.themeService.hideNativeSplash());
+    }
+  }
+}

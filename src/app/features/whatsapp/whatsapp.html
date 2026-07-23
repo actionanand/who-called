@@ -1,0 +1,92 @@
+<div class="page whatsapp-page">
+  <header class="page-heading">
+    <p class="eyebrow">No contact needed</p>
+    <h1>Chat on WhatsApp</h1>
+    <p>Start a conversation without adding the number to any address book.</p>
+  </header>
+
+  <section class="privacy-banner">
+    <app-icon name="shield" />
+    <span
+      ><strong>Your number stays private</strong
+      ><small>We format it locally, then hand it directly to WhatsApp.</small></span
+    >
+  </section>
+
+  <form class="card chat-form" [formGroup]="form" (ngSubmit)="openChat()">
+    <div class="field">
+      <span class="field-label">Country or territory</span>
+      <app-select-picker
+        [value]="form.controls.country.value"
+        [options]="countryOptions"
+        sheetTitle="Country or territory"
+        (valueChange)="selectCountry($event)"
+      />
+    </div>
+    <div class="phone-row">
+      <div class="field code">
+        <label for="wa-code">Code</label>
+        <input
+          id="wa-code"
+          formControlName="callingCode"
+          inputmode="tel"
+          (blur)="normalizeCallingCode()"
+        />
+      </div>
+      <div class="field number">
+        <label for="wa-number">Mobile number</label>
+        <div class="input-action">
+          <input
+            id="wa-number"
+            formControlName="number"
+            inputmode="tel"
+            autocomplete="tel-national"
+            placeholder="98765 43210"
+          />
+          <button type="button" aria-label="Paste number from clipboard" (click)="pasteNumber()">
+            <app-icon name="clipboard" />
+          </button>
+        </div>
+      </div>
+    </div>
+    @if (attempted() && !generatedUrl()) {
+      <p class="error-message">Enter a calling code and a valid phone number.</p>
+    }
+    <div class="field">
+      <label for="wa-message">Message <span>(optional)</span></label>
+      <textarea
+        id="wa-message"
+        formControlName="message"
+        placeholder="Hi! I’m reaching out about…"
+      ></textarea>
+      <small>The message is URL-encoded on this device.</small>
+    </div>
+    <button class="primary-button open-button" type="submit">
+      <app-icon name="message" /> Open WhatsApp chat
+    </button>
+  </form>
+
+  <section class="steps" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <ol>
+      <li>
+        <span>1</span>
+        <p><strong>Enter a number</strong><small>India and +91 are selected by default.</small></p>
+      </li>
+      <li>
+        <span>2</span>
+        <p>
+          <strong>We clean the formatting</strong
+          ><small>Spaces, brackets and local prefixes are handled locally.</small>
+        </p>
+      </li>
+      <li>
+        <span>3</span>
+        <p>
+          <strong>WhatsApp takes over</strong
+          ><small>You review and send the message yourself.</small>
+        </p>
+      </li>
+    </ol>
+  </section>
+</div>

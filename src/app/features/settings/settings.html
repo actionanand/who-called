@@ -1,0 +1,449 @@
+<div class="page settings-page">
+  <header class="page-heading">
+    <h1>Settings</h1>
+    <p>Control privacy, appearance and Android integration.</p>
+  </header>
+
+  <section aria-labelledby="security-title">
+    <h2 id="security-title" class="group-title">Security</h2>
+    <div class="card settings-card">
+      <button type="button" (click)="openPanel('lock')">
+        <span class="setting-icon green"><app-icon name="lock" /></span>
+        <span>
+          <strong>Application lock</strong>
+          <small>{{
+            store.settings().pinEnabled
+              ? 'PIN enabled · tap to manage'
+              : 'Set a PIN and lock the app'
+          }}</small>
+        </span>
+        <span [class]="store.settings().pinEnabled ? 'status-on' : 'status-off'">
+          {{ store.settings().pinEnabled ? 'On' : 'Off' }}
+        </span>
+      </button>
+      <button type="button" (click)="openPanel('privacy')">
+        <span class="setting-icon blue"><app-icon name="shield" /></span>
+        <span>
+          <strong>Privacy protection</strong>
+          <small>Encrypted local data and screenshots</small>
+        </span>
+        <app-icon name="chevron" />
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="appearance-title">
+    <h2 id="appearance-title" class="group-title">Appearance</h2>
+    <div class="card theme-card">
+      <button
+        type="button"
+        [class.selected]="store.settings().theme === 'light'"
+        (click)="selectTheme('light')"
+      >
+        <app-icon name="sun" /><span>Light</span>
+        @if (store.settings().theme === 'light') {
+          <app-icon name="check" />
+        }
+      </button>
+      <button
+        type="button"
+        [class.selected]="store.settings().theme === 'dark'"
+        (click)="selectTheme('dark')"
+      >
+        <app-icon name="moon" /><span>Dark</span>
+        @if (store.settings().theme === 'dark') {
+          <app-icon name="check" />
+        }
+      </button>
+      <button
+        type="button"
+        [class.selected]="store.settings().theme === 'automatic'"
+        (click)="selectTheme('automatic')"
+      >
+        <app-icon name="smartphone" /><span>Automatic</span>
+        @if (store.settings().theme === 'automatic') {
+          <app-icon name="check" />
+        }
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="defaults-title">
+    <h2 id="defaults-title" class="group-title">Contacts</h2>
+    <div class="card settings-card">
+      <button type="button" (click)="openPanel('country')">
+        <span class="setting-icon amber">{{ countryIso() }}</span>
+        <span>
+          <strong>Default country</strong>
+          <small
+            >{{ store.settings().defaultCountry }} ·
+            {{ store.settings().defaultCallingCode }}</small
+          >
+        </span>
+        <app-icon name="chevron" />
+      </button>
+      <button type="button" (click)="toggleHiddenContacts()">
+        <span class="setting-icon green"><app-icon name="eye-off" /></span>
+        <span>
+          <strong>Hide hidden contacts</strong>
+          <small>They remain available when you search</small>
+        </span>
+        <span [class]="store.settings().hideHiddenContacts ? 'status-on' : 'status-off'">
+          {{ store.settings().hideHiddenContacts ? 'On' : 'Off' }}
+        </span>
+      </button>
+      <button type="button" (click)="toggleWhatsAppFallback()">
+        <span class="setting-icon green"><app-icon name="message" /></span>
+        <span
+          ><strong>WhatsApp fallback</strong><small>Try WhatsApp Business when needed</small></span
+        >
+        <span [class]="store.settings().whatsappBusinessFallback ? 'status-on' : 'status-off'">
+          {{ store.settings().whatsappBusinessFallback ? 'On' : 'Off' }}
+        </span>
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="android-title">
+    <h2 id="android-title" class="group-title">Android integration</h2>
+    <div class="card settings-card">
+      <button type="button" (click)="deviceCallHistory()">
+        <span class="setting-icon blue"><app-icon name="phone" /></span>
+        <span
+          ><strong>Device call history</strong
+          ><small>Optional Android-only integration</small></span
+        >
+        <span [class]="store.settings().deviceCallHistoryEnabled ? 'status-on' : 'status-off'">
+          {{ store.settings().deviceCallHistoryEnabled ? 'On' : 'Off' }}
+        </span>
+      </button>
+      <button type="button" (click)="toggleRecentActivity()">
+        <span class="setting-icon green"><app-icon name="clock" /></span>
+        <span
+          ><strong>Recent activity</strong
+          ><small>Only activity started through this app</small></span
+        >
+        <span [class]="store.settings().recentActivityEnabled ? 'status-on' : 'status-off'">
+          {{ store.settings().recentActivityEnabled ? 'On' : 'Off' }}
+        </span>
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="data-title">
+    <h2 id="data-title" class="group-title">Data</h2>
+    <div class="card settings-card">
+      <button type="button" (click)="openPanel('backup')">
+        <span class="setting-icon green"><app-icon name="archive" /></span>
+        <span><strong>Encrypted backup</strong><small>Create a .contactvault file</small></span>
+        <app-icon name="chevron" />
+      </button>
+      <input
+        #restoreFileInput
+        class="visually-hidden"
+        type="file"
+        accept=".contactvault"
+        (change)="selectRestoreFile($event)"
+      />
+      <button type="button" (click)="chooseRestore(restoreFileInput)">
+        <span class="setting-icon amber"><app-icon name="restore" /></span>
+        <span
+          ><strong>Restore encrypted backup</strong
+          ><small>Choose an existing .contactvault file</small></span
+        >
+        <app-icon name="chevron" />
+      </button>
+      <button type="button" (click)="openPanel('export')">
+        <span class="setting-icon blue"><app-icon name="document" /></span>
+        <span><strong>Import & export</strong><small>vCard, CSV and encrypted backup</small></span>
+        <app-icon name="chevron" />
+      </button>
+    </div>
+  </section>
+
+  <footer>
+    <img ngSrc="/who-called.png" width="44" height="44" alt="" />
+    <strong>Who Called?</strong>
+    @if (isAndroid()) {
+      <span>Version {{ androidVersion() }} · Android</span>
+    }
+  </footer>
+</div>
+
+@if (panel()) {
+  <button
+    class="panel-scrim"
+    type="button"
+    aria-label="Close settings panel"
+    (click)="closePanel()"
+  ></button>
+  <section
+    class="settings-panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-panel-title"
+  >
+    <header>
+      <h2 id="settings-panel-title">
+        @switch (panel()) {
+          @case ('lock') {
+            Application lock
+          }
+          @case ('privacy') {
+            Privacy protection
+          }
+          @case ('country') {
+            Default country
+          }
+          @case ('backup') {
+            Encrypted backup
+          }
+          @case ('restore') {
+            Restore encrypted backup
+          }
+          @case ('export') {
+            Import & export
+          }
+        }
+      </h2>
+      <button type="button" aria-label="Close" (click)="closePanel()">
+        <app-icon name="close" />
+      </button>
+    </header>
+
+    @switch (panel()) {
+      @case ('lock') {
+        @if (store.settings().pinEnabled) {
+          <div class="panel-copy">
+            <span class="large-icon"><app-icon name="lock" /></span>
+            <h3>Application PIN is enabled</h3>
+            <p>Lock the application now or remove the PIN from this device.</p>
+          </div>
+          <button class="primary-button full-button" type="button" (click)="manualLock()">
+            Lock now
+          </button>
+          @if (biometricAvailable()) {
+            @if (!store.settings().biometricEnabled) {
+              <div class="field">
+                <label for="biometric-pin">Current PIN</label>
+                <input
+                  id="biometric-pin"
+                  type="password"
+                  inputmode="numeric"
+                  maxlength="8"
+                  [ngModel]="pin()"
+                  (ngModelChange)="pin.set($event)"
+                />
+              </div>
+            }
+            <button
+              class="secondary-button full-button"
+              type="button"
+              [disabled]="busy()"
+              (click)="toggleBiometric()"
+            >
+              <app-icon name="biometric" />
+              {{ store.settings().biometricEnabled ? 'Disable biometrics' : 'Enable biometrics' }}
+            </button>
+          } @else if (isAndroid()) {
+            <p class="panel-intro">
+              Strong biometrics are not available or enrolled on this device.
+            </p>
+          }
+          @if (error()) {
+            <p class="panel-error">{{ error() }}</p>
+          }
+          <button class="secondary-button full-button" type="button" (click)="removePin()">
+            Remove PIN
+          </button>
+        } @else {
+          <p class="panel-intro">
+            Choose a numeric PIN with 4 to 8 digits. Only a salted verifier is stored.
+          </p>
+          <div class="field">
+            <label for="new-pin">New PIN</label>
+            <input
+              id="new-pin"
+              type="password"
+              inputmode="numeric"
+              maxlength="8"
+              [ngModel]="pin()"
+              (ngModelChange)="pin.set($event)"
+            />
+          </div>
+          <div class="field">
+            <label for="confirm-pin">Confirm PIN</label>
+            <input
+              id="confirm-pin"
+              type="password"
+              inputmode="numeric"
+              maxlength="8"
+              [ngModel]="pinConfirmation()"
+              (ngModelChange)="pinConfirmation.set($event)"
+            />
+          </div>
+          @if (error()) {
+            <p class="panel-error">{{ error() }}</p>
+          }
+          <button
+            class="primary-button full-button"
+            type="button"
+            [disabled]="busy()"
+            (click)="savePin()"
+          >
+            <app-icon name="lock" /> {{ busy() ? 'Securing…' : 'Enable PIN' }}
+          </button>
+        }
+      }
+      @case ('privacy') {
+        <div class="panel-copy">
+          <span class="large-icon"><app-icon name="shield" /></span>
+          <h3>Encrypted and offline</h3>
+          <p>Contacts, messages and tagged numbers are encrypted before entering IndexedDB.</p>
+        </div>
+        <button class="toggle-setting" type="button" (click)="toggleScreenshotProtection()">
+          <span
+            ><strong>Block Android screenshots</strong
+            ><small>Uses FLAG_SECURE in the Android shell</small></span
+          >
+          <span [class]="store.settings().screenshotProtection ? 'status-on' : 'status-off'">
+            {{ store.settings().screenshotProtection ? 'On' : 'Off' }}
+          </span>
+        </button>
+      }
+      @case ('country') {
+        <p class="panel-intro">Used when adding contacts and starting WhatsApp chats.</p>
+        <app-select-picker
+          [value]="store.settings().defaultCountry"
+          [options]="countryOptions"
+          sheetTitle="Default country"
+          (valueChange)="selectCountry($event)"
+        />
+      }
+      @case ('backup') {
+        <p class="panel-intro">Backups use PBKDF2 and AES-GCM. The passphrase is never saved.</p>
+        <div class="field">
+          <label for="backup-passphrase">Backup passphrase</label>
+          <input
+            id="backup-passphrase"
+            type="password"
+            autocomplete="new-password"
+            [ngModel]="backupPassphrase()"
+            (ngModelChange)="backupPassphrase.set($event)"
+          />
+          <small>Use at least 8 characters.</small>
+        </div>
+        <div class="field">
+          <label for="backup-confirmation">Confirm passphrase</label>
+          <input
+            id="backup-confirmation"
+            type="password"
+            autocomplete="new-password"
+            [ngModel]="backupConfirmation()"
+            (ngModelChange)="backupConfirmation.set($event)"
+          />
+        </div>
+        @if (error()) {
+          <p class="panel-error">{{ error() }}</p>
+        }
+        <button
+          class="primary-button full-button"
+          type="button"
+          [disabled]="busy()"
+          (click)="createBackup()"
+        >
+          <app-icon name="archive" /> Create encrypted backup
+        </button>
+      }
+      @case ('restore') {
+        <p class="panel-intro">
+          Enter the password used to create <strong>{{ restoreFile()?.name }}</strong
+          >.
+        </p>
+        <div class="field">
+          <label for="restore-passphrase">Backup password</label>
+          <input
+            id="restore-passphrase"
+            type="password"
+            autocomplete="current-password"
+            [ngModel]="backupPassphrase()"
+            (ngModelChange)="backupPassphrase.set($event)"
+          />
+        </div>
+        @if (error()) {
+          <p class="panel-error">{{ error() }}</p>
+        }
+        <button
+          class="primary-button full-button"
+          type="button"
+          [disabled]="busy() || backupPassphrase().length < 8"
+          (click)="restoreBackup()"
+        >
+          <app-icon name="restore" />
+          {{ busy() ? 'Restoring…' : 'Restore encrypted backup' }}
+        </button>
+      }
+      @case ('export') {
+        <div class="warning-card">
+          <app-icon name="shield" />
+          <p>
+            <strong>Exports are not encrypted</strong
+            ><small>Store CSV and vCard files carefully.</small>
+          </p>
+        </div>
+        <button class="secondary-button export-button" type="button" (click)="exportVCard()">
+          <app-icon name="contacts" /><span
+            ><strong>Export vCard</strong><small>Compatible with most contact apps</small></span
+          >
+        </button>
+        <input
+          #vcardFile
+          class="visually-hidden"
+          type="file"
+          accept=".vcf,.vcard,text/vcard"
+          (change)="importContacts($event, 'vcard')"
+        />
+        <button
+          class="secondary-button export-button"
+          type="button"
+          [disabled]="busy()"
+          (click)="chooseImport(vcardFile)"
+        >
+          <app-icon name="user-plus" /><span
+            ><strong>Import vCard</strong><small>Add contacts from a .vcf file</small></span
+          >
+        </button>
+        <input
+          #csvFile
+          class="visually-hidden"
+          type="file"
+          accept=".csv,text/csv"
+          (change)="importContacts($event, 'csv')"
+        />
+        <button
+          class="secondary-button export-button"
+          type="button"
+          [disabled]="busy()"
+          (click)="chooseImport(csvFile)"
+        >
+          <app-icon name="user-plus" /><span
+            ><strong>Import CSV</strong><small>Name and phone are required</small></span
+          >
+        </button>
+        @if (error()) {
+          <p class="panel-error">{{ error() }}</p>
+        }
+        <button class="secondary-button export-button" type="button" (click)="exportCsv()">
+          <app-icon name="document" /><span
+            ><strong>Export CSV</strong><small>Useful for spreadsheets</small></span
+          >
+        </button>
+        <button class="secondary-button export-button" type="button" (click)="openPanel('backup')">
+          <app-icon name="archive" /><span
+            ><strong>Encrypted backup</strong><small>Recommended for complete app data</small></span
+          >
+        </button>
+      }
+    }
+  </section>
+}
