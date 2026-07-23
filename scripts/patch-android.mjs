@@ -137,7 +137,11 @@ await writeFile(
   splashPath,
   `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="#111B21" />
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#111B21" />
+        </shape>
+    </item>
     <item android:gravity="center">
         <inset
             android:drawable="@drawable/who_called_splash_icon"
