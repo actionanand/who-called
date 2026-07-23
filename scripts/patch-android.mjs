@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const capacitorConfigPath = resolve('android/app/src/main/assets/capacitor.config.json');
@@ -7,6 +7,15 @@ const appId = capacitorConfig.appId;
 
 if (typeof appId !== 'string' || !appId.trim()) {
   throw new Error(`Android appId is missing from ${capacitorConfigPath}.`);
+}
+
+async function fileExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const javaPath = resolve('android/app/src/main/java', ...appId.split('.'), 'MainActivity.java');
@@ -99,6 +108,20 @@ await writeFile(
 </vector>`,
   'utf8',
 );
+
+try {
+  for (const directory of await readdir(resPath)) {
+    if (!directory.startsWith('drawable')) continue;
+    const generatedSplashPng = resolve(resPath, directory, 'splash.png');
+    const generatedSplashXml = resolve(resPath, directory, 'splash.xml');
+    if (await fileExists(generatedSplashPng)) await rm(generatedSplashPng);
+    if (directory !== 'drawable' && (await fileExists(generatedSplashXml))) {
+      await rm(generatedSplashXml);
+    }
+  }
+} catch {
+  // Capacitor creates resource folders during sync; missing folders are harmless here.
+}
 
 await mkdir(dirname(splashLogoPath), { recursive: true });
 await copyFile(splashSourcePath, splashLogoPath);

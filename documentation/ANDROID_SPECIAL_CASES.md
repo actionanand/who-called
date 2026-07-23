@@ -20,6 +20,8 @@ Android 12+ draws a system launch window before Angular, JavaScript, Capacitor p
 
 `public/who-called.png` is the canonical source. Do not place it on a white tile or opaque canvas. Android controls the system splash icon mask and safe area.
 
+Capacitor may generate a legacy `res/drawable/splash.png` during `cap sync`. The native patch intentionally removes generated `splash.png` files before writing `res/drawable/splash.xml`; Android cannot merge two resources with the same `@drawable/splash` name in one density bucket.
+
 Verify a force-stopped cold launch on Android 12+ and one older supported version, in portrait and landscape. Confirm there is no white square, white flash, clipping, stretching or mismatched transition.
 
 ## Light and dark notification/status surfaces
