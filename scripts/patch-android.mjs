@@ -209,6 +209,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
@@ -365,7 +366,12 @@ public class MainActivity extends BridgeActivity {
 
     @JavascriptInterface
     public String appVersion() {
-      return BuildConfig.VERSION_NAME;
+      try {
+        PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+        return info.versionName == null ? "" : info.versionName;
+      } catch (Exception ignored) {
+        return "";
+      }
     }
 
     @JavascriptInterface
