@@ -33,7 +33,14 @@
     <section class="contact-stack" aria-label="Contacts">
       @for (contact of filteredContacts(); track contact.id) {
         <article class="contact-card card">
-          <div class="avatar" aria-hidden="true">{{ contact.name.slice(0, 1).toUpperCase() }}</div>
+          <button
+            class="avatar"
+            type="button"
+            [attr.aria-label]="'View details for ' + displayName(contact)"
+            (click)="openContactDetails(contact)"
+          >
+            {{ contact.name.slice(0, 1).toUpperCase() }}
+          </button>
           <div class="copy">
             <span class="name-line">
               <strong>{{ displayName(contact) }}</strong>
@@ -60,22 +67,22 @@
             }
           </div>
           <div class="row-actions">
-            @if (contact.whatsappEnabled) {
-              <a
-                [href]="'https://wa.me/' + contact.normalizedPhone.slice(1)"
-                target="_blank"
-                rel="noopener"
+            @if (whatsappPhones(contact).length) {
+              <button
+                type="button"
                 [attr.aria-label]="'Open WhatsApp chat with ' + displayName(contact)"
+                (click)="openPhoneAction(contact, 'whatsapp')"
               >
                 <app-icon name="message" />
-              </a>
+              </button>
             }
-            <a
-              [href]="'tel:' + contact.normalizedPhone"
+            <button
+              type="button"
               [attr.aria-label]="'Call ' + displayName(contact)"
+              (click)="openPhoneAction(contact, 'call')"
             >
               <app-icon name="phone" />
-            </a>
+            </button>
             <button
               type="button"
               [attr.aria-label]="'Edit ' + displayName(contact)"
@@ -366,5 +373,151 @@
         </button>
       </div>
     </form>
+  </section>
+}
+
+@if (phoneChoice(); as choice) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close phone number chooser"
+    (click)="closePhoneChoice()"
+  ></button>
+  <section
+    class="choice-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="phone-choice-title"
+  >
+    <header>
+      <div>
+        <p>{{ choice.mode === 'whatsapp' ? 'WhatsApp' : 'Phone call' }}</p>
+        <h2 id="phone-choice-title">Choose number</h2>
+      </div>
+      <button type="button" aria-label="Close" (click)="closePhoneChoice()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <div class="choice-list">
+      @for (phone of choice.phones; track phone.id) {
+        <button type="button" (click)="choosePhone(phone)">
+          <span>
+            <strong>{{ phone.type }}</strong>
+            <small>{{ phoneLabel(phone) }}</small>
+          </span>
+          <app-icon [name]="choice.mode === 'whatsapp' ? 'message' : 'phone'" />
+        </button>
+      }
+    </div>
+  </section>
+}
+
+@if (selectedContact(); as contact) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close contact details"
+    (click)="closeContactDetails()"
+  ></button>
+  <section
+    class="details-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="contact-details-title"
+  >
+    <header>
+      <span class="details-avatar" aria-hidden="true">{{
+        contact.name.slice(0, 1).toUpperCase()
+      }}</span>
+      <div>
+        <p>Contact details</p>
+        <h2 id="contact-details-title">{{ displayName(contact) }}</h2>
+        @if (contact.company) {
+          <small>{{ contact.company }}</small>
+        }
+      </div>
+      <button type="button" aria-label="Close" (click)="closeContactDetails()">
+        <app-icon name="close" />
+      </button>
+    </header>
+
+    <div class="details-content">
+      <section class="details-section">
+        <h3>Phone numbers</h3>
+        @for (phone of contactPhones(contact); track phone.id) {
+          <div class="detail-row">
+            <app-icon name="phone" />
+            <span>
+              <strong>{{ phone.type }}</strong>
+              <small>{{ phoneLabel(phone) }}</small>
+            </span>
+            @if (phone.whatsappEnabled) {
+              <app-icon name="message" />
+            }
+          </div>
+        }
+      </section>
+
+      @if (contact.emails?.length) {
+        <section class="details-section">
+          <h3>Email addresses</h3>
+          @for (email of contact.emails; track email.id) {
+            <a class="detail-row link-row" [href]="'mailto:' + email.value">
+              <app-icon name="email" />
+              <span>
+                <strong>{{ email.type }}</strong>
+                <small>{{ email.value }}</small>
+              </span>
+              <app-icon name="chevron" />
+            </a>
+          }
+        </section>
+      }
+
+      @if (contact.socialLinks?.length) {
+        <section class="details-section">
+          <h3>Social media & websites</h3>
+          @for (link of contact.socialLinks; track link.id) {
+            <a class="detail-row link-row" [href]="link.url" target="_blank" rel="noopener">
+              <app-icon name="globe" />
+              <span>
+                <strong>{{ link.platform }}</strong>
+                <small>{{ link.url }}</small>
+              </span>
+              <app-icon name="chevron" />
+            </a>
+          }
+        </section>
+      }
+
+      @if (contact.birthDate) {
+        <section class="details-section">
+          <h3>Date of birth</h3>
+          <div class="detail-row">
+            <app-icon name="birthday" />
+            <span>
+              <strong>{{ birthdayLabel(contact) }}</strong>
+              <small>{{ birthdayDetail(contact) }}</small>
+            </span>
+          </div>
+        </section>
+      }
+
+      @if (contact.notes) {
+        <section class="details-section">
+          <h3>Private note</h3>
+          <p class="details-note">{{ contact.notes }}</p>
+        </section>
+      }
+
+      <div class="details-actions">
+        <button class="secondary-button" type="button" (click)="editContact(contact)">
+          <app-icon name="edit" /> Edit
+        </button>
+        <button class="primary-button" type="button" (click)="openPhoneAction(contact, 'call')">
+          <app-icon name="phone" /> Call
+        </button>
+      </div>
+    </div>
   </section>
 }

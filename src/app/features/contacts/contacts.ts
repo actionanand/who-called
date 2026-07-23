@@ -47,6 +47,13 @@ const DOB_MODES: readonly SelectPickerOption[] = [
   { value: 'full', label: 'Full date of birth', detail: 'Shows the current age' },
 ];
 
+type PhoneAction = 'call' | 'whatsapp';
+
+interface PhoneChoiceSheet {
+  readonly mode: PhoneAction;
+  readonly phones: readonly ContactPhone[];
+}
+
 @Component({
   selector: 'app-contacts',
   imports: [AppIcon, ReactiveFormsModule, SelectPicker],
@@ -65,6 +72,8 @@ export class Contacts {
   protected readonly search = signal('');
   protected readonly saving = signal(false);
   protected readonly revealedNames = signal<ReadonlySet<string>>(new Set());
+  protected readonly phoneChoice = signal<PhoneChoiceSheet | null>(null);
+  protected readonly selectedContact = signal<PrivateContact | null>(null);
   protected readonly formatPhone = formatIndianPhone;
   protected readonly phoneTypes = PHONE_TYPES;
   protected readonly emailTypes = EMAIL_TYPES;
@@ -342,6 +351,89 @@ export class Contacts {
     );
   }
 
+  protected openPhoneAction(contact: PrivateContact, mode: PhoneAction): void {
+    this.closeContactDetails();
+    const phones =
+      mode === 'whatsapp'
+        ? this.contactPhones(contact).filter((phone) => phone.whatsappEnabled)
+        : this.contactPhones(contact);
+    if (!phones.length) {
+      this.feedback.notify(
+        mode === 'whatsapp'
+          ? 'No WhatsApp-enabled number saved for this contact'
+          : 'No phone number saved for this contact',
+      );
+      return;
+    }
+    if (phones.length === 1) {
+      this.openPhone(phones[0], mode);
+      return;
+    }
+    this.phoneChoice.set({ mode, phones });
+  }
+
+  protected closePhoneChoice(): void {
+    this.phoneChoice.set(null);
+  }
+
+  protected choosePhone(phone: ContactPhone): void {
+    const choice = this.phoneChoice();
+    if (!choice) return;
+    this.closePhoneChoice();
+    this.openPhone(phone, choice.mode);
+  }
+
+  protected openContactDetails(contact: PrivateContact): void {
+    this.selectedContact.set(contact);
+  }
+
+  protected closeContactDetails(): void {
+    this.selectedContact.set(null);
+  }
+
+  protected editContact(contact: PrivateContact): void {
+    this.closeContactDetails();
+    this.openEditor(contact);
+  }
+
+  protected contactPhones(contact: PrivateContact): readonly ContactPhone[] {
+    return contact.phones?.length
+      ? contact.phones
+      : [
+          {
+            id: contact.id,
+            type: 'Mobile',
+            callingCode: '+91',
+            number: contact.phone,
+            normalizedNumber: contact.normalizedPhone,
+            whatsappEnabled: contact.whatsappEnabled,
+          },
+        ];
+  }
+
+  protected whatsappPhones(contact: PrivateContact): readonly ContactPhone[] {
+    return this.contactPhones(contact).filter((phone) => phone.whatsappEnabled);
+  }
+
+  protected phoneLabel(phone: ContactPhone): string {
+    return `${phone.callingCode} ${this.formatPhone(phone.number)}`.trim();
+  }
+
+  protected birthdayLabel(contact: PrivateContact): string {
+    const birthDate = contact.birthDate;
+    if (!birthDate) return '';
+    const month = String(birthDate.month).padStart(2, '0');
+    const day = String(birthDate.day).padStart(2, '0');
+    if (birthDate.mode === 'full' && birthDate.year) return `${day}/${month}/${birthDate.year}`;
+    return `${day}/${month}`;
+  }
+
+  protected birthdayDetail(contact: PrivateContact): string {
+    const currentAge = this.age(contact);
+    if (currentAge === null) return 'Month and date saved';
+    return `${currentAge} years old`;
+  }
+
   protected age(contact: PrivateContact): number | null {
     const birthDate = contact.birthDate;
     if (birthDate?.mode !== 'full' || !birthDate.year) return null;
@@ -364,6 +456,19 @@ export class Contacts {
       number: [phone?.number ?? '', [Validators.required, Validators.minLength(6)]],
       whatsappEnabled: phone?.whatsappEnabled ?? true,
     });
+  }
+
+  private openPhone(phone: ContactPhone, mode: PhoneAction): void {
+    const normalized = phone.normalizedNumber;
+    if (mode === 'whatsapp') {
+      this.document.defaultView?.open(
+        `https://wa.me/${normalized.slice(1)}`,
+        '_blank',
+        'noopener,noreferrer',
+      );
+      return;
+    }
+    this.document.defaultView?.location.assign(`tel:${normalized}`);
   }
 
   private createEmail(email?: ContactEmail) {
