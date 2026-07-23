@@ -1,44 +1,88 @@
-<style>
-  :host {
-    display: block;
-    min-height: 100dvh;
-    color: #17202a;
-    background: #f6f8fb;
-    font-family: Arial, Helvetica, sans-serif;
-  }
+<div class="app-frame">
+  <header class="topbar">
+    <a class="brand" routerLink="/home" aria-label="Who Called home">
+      <img ngSrc="/who-called.png" width="40" height="40" priority alt="" />
+      <span>
+        <strong>Who Called?</strong>
+        <small>Private. Offline. Yours.</small>
+      </span>
+    </a>
+    <button class="icon-button" type="button" aria-label="Search everything" routerLink="/contacts">
+      <app-icon name="search" />
+    </button>
+  </header>
 
-  main {
-    display: grid;
-    min-height: 100dvh;
-    place-items: center;
-    padding: 2rem;
-    text-align: center;
-  }
+  <main id="main-content" tabindex="-1">
+    <router-outlet />
+  </main>
 
-  .intro {
-    max-width: 36rem;
-  }
+  <nav class="bottom-nav" aria-label="Primary navigation">
+    <a routerLink="/home" routerLinkActive="active"><app-icon name="home" /><span>Home</span></a>
+    <a routerLink="/contacts" routerLinkActive="active"
+      ><app-icon name="contacts" /><span>Contacts</span></a
+    >
+    <span class="fab-space" aria-hidden="true"></span>
+    <a routerLink="/messages" routerLinkActive="active"
+      ><app-icon name="bookmark" /><span>Saved</span></a
+    >
+    <a routerLink="/settings" routerLinkActive="active"
+      ><app-icon name="settings" /><span>Settings</span></a
+    >
+  </nav>
 
-  h1 {
-    margin: 0;
-    font-size: clamp(2rem, 6vw, 4rem);
-    font-weight: 700;
-    line-height: 1.1;
-  }
+  <button
+    class="fab"
+    type="button"
+    aria-label="Open quick actions"
+    [attr.aria-expanded]="store.quickActionsOpen()"
+    aria-controls="quick-actions"
+    (click)="store.quickActionsOpen.set(true)"
+  >
+    <app-icon name="plus" />
+  </button>
+</div>
 
-  p {
-    margin: 1rem 0 0;
-    color: #415164;
-    font-size: 1.125rem;
-    line-height: 1.6;
-  }
-</style>
-
-<main>
-  <section class="intro" aria-labelledby="page-title">
-    <h1 id="page-title">who-called</h1>
-    <p>A simple default project template ready to clone and build from.</p>
+@if (store.quickActionsOpen()) {
+  <button
+    class="scrim"
+    type="button"
+    aria-label="Close quick actions"
+    (click)="closeQuickActions()"
+  ></button>
+  <section
+    id="quick-actions"
+    class="action-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="quick-title"
+  >
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-heading">
+      <div>
+        <p class="eyebrow">Quick actions</p>
+        <h2 id="quick-title">What would you like to do?</h2>
+      </div>
+      <button class="icon-button" type="button" aria-label="Close" (click)="closeQuickActions()">
+        <app-icon name="close" />
+      </button>
+    </div>
+    <div class="sheet-grid">
+      <a routerLink="/contacts" [queryParams]="{ add: 1 }" (click)="closeQuickActions()">
+        <span class="action-icon mint"><app-icon name="user-plus" /></span>
+        <span><strong>Add contact</strong><small>Keep it private</small></span>
+      </a>
+      <a routerLink="/whatsapp" (click)="closeQuickActions()">
+        <span class="action-icon green"><app-icon name="message" /></span>
+        <span><strong>WhatsApp chat</strong><small>Without saving</small></span>
+      </a>
+      <a routerLink="/messages" [queryParams]="{ add: 1 }" (click)="closeQuickActions()">
+        <span class="action-icon amber"><app-icon name="bookmark-plus" /></span>
+        <span><strong>Save message</strong><small>OTP, booking, note</small></span>
+      </a>
+      <a routerLink="/tagged" (click)="closeQuickActions()">
+        <span class="action-icon blue"><app-icon name="tag" /></span>
+        <span><strong>Tag a number</strong><small>Note an unknown caller</small></span>
+      </a>
+    </div>
   </section>
-</main>
-
-<router-outlet />
+}

@@ -1,0 +1,127 @@
+.whatsapp-page {
+  max-width: 38rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.25rem !important;
+  color: var(--primary) !important;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.privacy-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border-subtle));
+  border-radius: 1rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.privacy-banner > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.privacy-banner small {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.chat-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.phone-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.7rem;
+}
+
+.field label span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.input-action {
+  display: flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.input-action input {
+  min-width: 0;
+  border: 0;
+}
+
+.input-action button {
+  width: 3rem;
+  padding: 0;
+  border: 0;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.error-message {
+  margin: -0.45rem 0 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+.open-button {
+  width: 100%;
+}
+
+.steps {
+  margin-top: 1.6rem;
+}
+
+.steps h2 {
+  font-size: 1rem;
+}
+
+.steps ol {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.steps li > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.steps p {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.steps small {
+  color: var(--text-muted);
+  line-height: 1.4;
+}

@@ -1,0 +1,126 @@
+<div class="page settings-page">
+  <header class="page-heading">
+    <h1>Settings</h1>
+    <p>Control privacy, appearance and Android integration.</p>
+  </header>
+
+  <section aria-labelledby="security-title">
+    <h2 id="security-title" class="group-title">Security</h2>
+    <div class="card settings-card">
+      <button type="button">
+        <span class="setting-icon green"><app-icon name="lock" /></span>
+        <span><strong>Application lock</strong><small>PIN, biometric and auto-lock</small></span>
+        <app-icon name="chevron" />
+      </button>
+      <button type="button">
+        <span class="setting-icon blue"><app-icon name="shield" /></span>
+        <span
+          ><strong>Privacy protection</strong
+          ><small>Encrypted local data and screenshots</small></span
+        >
+        <app-icon name="chevron" />
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="appearance-title">
+    <h2 id="appearance-title" class="group-title">Appearance</h2>
+    <div class="card theme-card">
+      <button
+        type="button"
+        [class.selected]="store.settings().theme === 'light'"
+        (click)="selectTheme('light')"
+      >
+        <app-icon name="sun" /><span>Light</span>
+        @if (store.settings().theme === 'light') {
+          <app-icon name="check" />
+        }
+      </button>
+      <button
+        type="button"
+        [class.selected]="store.settings().theme === 'dark'"
+        (click)="selectTheme('dark')"
+      >
+        <app-icon name="moon" /><span>Dark</span>
+        @if (store.settings().theme === 'dark') {
+          <app-icon name="check" />
+        }
+      </button>
+      <button
+        type="button"
+        [class.selected]="store.settings().theme === 'automatic'"
+        (click)="selectTheme('automatic')"
+      >
+        <app-icon name="smartphone" /><span>Automatic</span>
+        @if (store.settings().theme === 'automatic') {
+          <app-icon name="check" />
+        }
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="defaults-title">
+    <h2 id="defaults-title" class="group-title">Contacts</h2>
+    <div class="card settings-card">
+      <button type="button">
+        <span class="setting-icon amber">IN</span>
+        <span><strong>Default country</strong><small>India · +91</small></span>
+        <app-icon name="chevron" />
+      </button>
+      <button type="button">
+        <span class="setting-icon green"><app-icon name="message" /></span>
+        <span
+          ><strong>WhatsApp fallback</strong><small>Try WhatsApp Business when needed</small></span
+        >
+        <span class="status-on">On</span>
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="android-title">
+    <h2 id="android-title" class="group-title">Android integration</h2>
+    <div class="card settings-card">
+      <button type="button">
+        <span class="setting-icon blue"><app-icon name="phone" /></span>
+        <span
+          ><strong>Device call history</strong
+          ><small>Optional permission · disabled in Play builds</small></span
+        >
+        <span class="status-off">Off</span>
+      </button>
+      <button type="button">
+        <span class="setting-icon green"><app-icon name="clock" /></span>
+        <span
+          ><strong>Recent activity</strong
+          ><small>Only activity started through this app</small></span
+        >
+        <span class="status-on">On</span>
+      </button>
+    </div>
+  </section>
+
+  <section aria-labelledby="data-title">
+    <h2 id="data-title" class="group-title">Data</h2>
+    <div class="card settings-card">
+      <button type="button">
+        <span class="setting-icon green"><app-icon name="archive" /></span>
+        <span
+          ><strong>Encrypted backup</strong
+          ><small>Create or restore a .contactvault file</small></span
+        >
+        <app-icon name="chevron" />
+      </button>
+      <button type="button">
+        <span class="setting-icon blue"><app-icon name="document" /></span>
+        <span><strong>Import & export</strong><small>vCard, CSV and encrypted backup</small></span>
+        <app-icon name="chevron" />
+      </button>
+    </div>
+  </section>
+
+  <footer>
+    <img ngSrc="/who-called.png" width="44" height="44" alt="" />
+    <strong>Who Called?</strong>
+    <span>Version 0.1.0 · Offline by default</span>
+  </footer>
+</div>

@@ -1,0 +1,177 @@
+<div class="page contacts-page">
+  <header class="page-heading heading-row">
+    <div>
+      <h1>Private contacts</h1>
+      <p>Separate from your Android address book.</p>
+    </div>
+    <button class="primary-button add-button" type="button" (click)="openEditor()">
+      <app-icon name="user-plus" /> <span>Add</span>
+    </button>
+  </header>
+
+  <label class="search-box">
+    <span class="visually-hidden">Search private contacts</span>
+    <app-icon name="search" />
+    <input
+      #searchInput
+      type="search"
+      placeholder="Search name, company, number or note"
+      (input)="search.set(searchInput.value)"
+    />
+  </label>
+
+  <div class="filter-row" aria-label="Contact filters">
+    <button class="active" type="button">All</button>
+    <button type="button">Favourites</button>
+    <button type="button">WhatsApp</button>
+    <button type="button">Has notes</button>
+  </div>
+
+  @if (store.loading()) {
+    <p class="status">Opening your encrypted contacts…</p>
+  } @else if (filteredContacts().length) {
+    <section class="contact-stack" aria-label="Contacts">
+      @for (contact of filteredContacts(); track contact.id) {
+        <article class="contact-card card">
+          <div class="avatar" aria-hidden="true">{{ contact.name.slice(0, 1).toUpperCase() }}</div>
+          <div class="copy">
+            <span class="name-line">
+              <strong>{{ contact.name }}</strong>
+              @if (contact.favorite) {
+                <app-icon name="favorite" />
+              }
+            </span>
+            <small>{{ contact.company || '+91 ' + formatPhone(contact.phone) }}</small>
+            @if (contact.notes) {
+              <p>{{ contact.notes }}</p>
+            }
+          </div>
+          <div class="row-actions">
+            @if (contact.whatsappEnabled) {
+              <a
+                [href]="'https://wa.me/' + contact.normalizedPhone.slice(1)"
+                target="_blank"
+                rel="noopener"
+                [attr.aria-label]="'Open WhatsApp chat with ' + contact.name"
+                ><app-icon name="message"
+              /></a>
+            }
+            <a [href]="'tel:' + contact.normalizedPhone" [attr.aria-label]="'Call ' + contact.name">
+              <app-icon name="phone" />
+            </a>
+            <button
+              type="button"
+              [attr.aria-label]="'Delete ' + contact.name"
+              (click)="remove(contact.id, contact.name)"
+            >
+              <app-icon name="trash" />
+            </button>
+          </div>
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="card empty-state">
+      <span class="empty-icon"><app-icon name="contacts" /></span>
+      <h3>{{ search() ? 'No matching contacts' : 'Your private list is empty' }}</h3>
+      <p>
+        {{
+          search()
+            ? 'Try a name, company, note, or part of a phone number.'
+            : 'Contacts saved here do not appear in Android Contacts.'
+        }}
+      </p>
+      @if (!search()) {
+        <button class="primary-button" type="button" (click)="openEditor()">
+          <app-icon name="user-plus" /> Add contact
+        </button>
+      }
+    </section>
+  }
+</div>
+
+@if (editorOpen()) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close contact editor"
+    (click)="closeEditor()"
+  ></button>
+  <section class="editor" role="dialog" aria-modal="true" aria-labelledby="contact-editor-title">
+    <header>
+      <div>
+        <p>Private contact</p>
+        <h2 id="contact-editor-title">Add a contact</h2>
+      </div>
+      <button type="button" aria-label="Close" (click)="closeEditor()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="avatar-picker" aria-hidden="true"><app-icon name="user-plus" /></div>
+      <div class="field">
+        <label for="contact-name">Contact name</label>
+        <input
+          id="contact-name"
+          formControlName="name"
+          autocomplete="name"
+          placeholder="e.g. Anand Kumar"
+        />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <small class="error">Enter a contact name.</small>
+        }
+      </div>
+      <div class="field">
+        <label for="contact-company">Company <span>(optional)</span></label>
+        <input
+          id="contact-company"
+          formControlName="company"
+          autocomplete="organization"
+          placeholder="Company or organisation"
+        />
+      </div>
+      <div class="phone-grid">
+        <div class="field code-field">
+          <label for="calling-code">Code</label>
+          <input id="calling-code" value="+91" readonly aria-readonly="true" />
+        </div>
+        <div class="field">
+          <label for="contact-phone">Mobile number</label>
+          <input
+            id="contact-phone"
+            formControlName="phone"
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel-national"
+            placeholder="98765 43210"
+          />
+          @if (form.controls.phone.touched && form.controls.phone.invalid) {
+            <small class="error">Enter a valid phone number.</small>
+          }
+        </div>
+      </div>
+      <div class="field">
+        <label for="contact-notes">Private note <span>(optional)</span></label>
+        <textarea
+          id="contact-notes"
+          formControlName="notes"
+          placeholder="How you know this person, follow-up details…"
+        ></textarea>
+      </div>
+      <label class="toggle-row">
+        <span><strong>WhatsApp enabled</strong><small>Show the WhatsApp shortcut</small></span>
+        <input type="checkbox" formControlName="whatsappEnabled" />
+      </label>
+      <label class="toggle-row">
+        <span><strong>Add to favourites</strong><small>Show on your home screen</small></span>
+        <input type="checkbox" formControlName="favorite" />
+      </label>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" (click)="closeEditor()">Cancel</button>
+        <button class="primary-button" type="submit" [disabled]="saving()">
+          <app-icon name="check" /> {{ saving() ? 'Encrypting…' : 'Save contact' }}
+        </button>
+      </div>
+    </form>
+  </section>
+}

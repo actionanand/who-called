@@ -1,0 +1,249 @@
+.heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.add-button {
+  min-width: auto;
+}
+
+.info-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.2rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.info-card p {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.info-card small {
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.message-stack {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.message-card {
+  padding: 1rem;
+}
+
+.message-card header,
+.message-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.category {
+  padding: 0.3rem 0.55rem;
+  border-radius: 2rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.message-card header button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: var(--surface-raised);
+}
+
+.message-card h2 {
+  margin: 0.8rem 0 0;
+  font-size: 1.05rem;
+}
+
+.message-card > p {
+  display: -webkit-box;
+  margin: 0.45rem 0 0.9rem;
+  overflow: hidden;
+  color: var(--text-muted);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.code-pill {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--primary) 55%, transparent);
+  border-radius: 0.9rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.code-pill span {
+  display: grid;
+  gap: 0.1rem;
+  text-align: left;
+}
+
+.code-pill strong {
+  font-size: 1.2rem;
+  letter-spacing: 0.1em;
+}
+.code-pill small {
+  color: var(--text-muted);
+}
+
+.message-card footer {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.message-card footer small {
+  color: var(--text-muted);
+}
+
+.modal-scrim {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgb(2 12 8 / 58%);
+}
+
+.editor {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  overflow-y: auto;
+  padding: 1rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+  background: var(--surface);
+}
+
+.editor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor > header p {
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor h2 {
+  margin: 0.2rem 0 0;
+}
+
+.editor > header button {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-raised);
+}
+
+.editor form {
+  display: grid;
+  gap: 1rem;
+  max-width: 34rem;
+  margin: 1.2rem auto 0;
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.label-row button {
+  border: 0;
+  color: var(--primary);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.field label span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.detected,
+.toggle-row {
+  display: flex;
+  min-height: 3.8rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+}
+
+.detected {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.detected span,
+.toggle-row span {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.detected small,
+.toggle-row small {
+  color: var(--text-muted);
+}
+.toggle-row input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--primary);
+}
+
+.form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 0.65rem;
+}
+
+@media (min-width: 720px) {
+  .editor {
+    inset: 4vh auto auto 50%;
+    width: min(38rem, calc(100% - 2rem));
+    max-height: 92vh;
+    transform: translateX(-50%);
+    border-radius: 1.5rem;
+    box-shadow: 0 2rem 5rem rgb(0 0 0 / 35%);
+  }
+}

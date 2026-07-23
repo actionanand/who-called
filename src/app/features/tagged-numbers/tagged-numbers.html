@@ -1,0 +1,132 @@
+<div class="page tagged-page">
+  <header class="page-heading heading-row">
+    <div>
+      <h1>Tagged numbers</h1>
+      <p>Remember an unknown caller without creating a contact.</p>
+    </div>
+    <button class="primary-button add-button" type="button" (click)="openEditor()">
+      <app-icon name="plus" /><span>Add</span>
+    </button>
+  </header>
+
+  <label class="search-box">
+    <span class="visually-hidden">Search tagged numbers</span>
+    <app-icon name="search" />
+    <input
+      #query
+      type="search"
+      placeholder="Search number, tag or note"
+      (input)="search.set(query.value)"
+    />
+  </label>
+
+  @if (filtered().length) {
+    <section class="tag-stack" aria-label="Tagged numbers">
+      @for (number of filtered(); track number.id) {
+        <article class="card tag-card">
+          <span class="tag-icon"><app-icon name="tag" /></span>
+          <div>
+            <strong>{{ number.normalizedPhone }}</strong>
+            <span class="badge">{{ number.tag }}</span>
+            <p>{{ number.note || 'No note added' }}</p>
+            <small
+              >Seen {{ number.appearanceCount }} time{{
+                number.appearanceCount === 1 ? '' : 's'
+              }}</small
+            >
+          </div>
+          <div class="actions">
+            <a
+              [href]="'tel:' + number.normalizedPhone"
+              [attr.aria-label]="'Call ' + number.normalizedPhone"
+              ><app-icon name="phone"
+            /></a>
+            <button type="button" aria-label="Delete temporary note" (click)="remove(number.id)">
+              <app-icon name="trash" />
+            </button>
+          </div>
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="card empty-state">
+      <span class="empty-icon"><app-icon name="tag" /></span>
+      <h3>{{ search() ? 'No matching tagged numbers' : 'No unknown numbers tagged' }}</h3>
+      <p>
+        Add a private note such as “Repeated Call”, “Courier”, or “Fraud” without creating a
+        contact.
+      </p>
+      @if (!search()) {
+        <button class="primary-button" type="button" (click)="openEditor()">
+          <app-icon name="plus" /> Tag a number
+        </button>
+      }
+    </section>
+  }
+</div>
+
+@if (editorOpen()) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Close tagged number editor"
+    (click)="editorOpen.set(false)"
+  ></button>
+  <section class="editor" role="dialog" aria-modal="true" aria-labelledby="tag-editor-title">
+    <header>
+      <div>
+        <p>Unknown caller</p>
+        <h2 id="tag-editor-title">Tag a number</h2>
+      </div>
+      <button type="button" aria-label="Close" (click)="editorOpen.set(false)">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="phone-row">
+        <div class="field code">
+          <label for="tag-code">Code</label><input id="tag-code" value="+91" readonly />
+        </div>
+        <div class="field">
+          <label for="tag-phone">Phone number</label
+          ><input
+            id="tag-phone"
+            formControlName="phone"
+            inputmode="tel"
+            placeholder="98765 43210"
+          />
+        </div>
+      </div>
+      <div class="field">
+        <label for="number-tag">Tag</label>
+        <select id="number-tag" formControlName="tag">
+          @for (tag of tags; track tag) {
+            <option [value]="tag">{{ tag }}</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label for="number-note">Short note <span>(optional)</span></label>
+        <textarea
+          id="number-note"
+          formControlName="note"
+          placeholder="Calls in the afternoon but never speaks."
+        ></textarea>
+      </div>
+      <label class="toggle-row">
+        <span
+          ><strong>Mark as important</strong><small>Show a stronger visual indicator</small></span
+        >
+        <input type="checkbox" formControlName="important" />
+      </label>
+      <div class="form-actions">
+        <button class="secondary-button" type="button" (click)="editorOpen.set(false)">
+          Cancel
+        </button>
+        <button class="primary-button" type="submit">
+          <app-icon name="check" /> Encrypt & save
+        </button>
+      </div>
+    </form>
+  </section>
+}
