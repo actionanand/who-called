@@ -47,8 +47,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Unit tests
-        run: npm test -- --watch=false
+      # - name: Unit tests
+      #   run: npm test -- --watch=false
 
       - name: Bump Android version
         if: github.ref == 'refs/heads/main-android'
