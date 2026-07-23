@@ -1,0 +1,2 @@
+function e(n){return n.replace(/\D/g,"")}function o(n,r){let i=e(n),t=e(r);return i==="91"&&t.length===11&&t.startsWith("0")&&(t=t.slice(1)),i&&t?`+${i}${t}`:""}function l(n){let r=e(n).slice(-10);return r.length!==10?n:`${r.slice(0,5)} ${r.slice(5)}`}function g(n,r,i){let t=o(n,r);if(t.length<8)return null;let s=i.trim();return `https://wa.me/${t.slice(1)}${s?`?text=${encodeURIComponent(s)}`:""}`}
+export{e,g,l,o};
