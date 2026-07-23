@@ -183,7 +183,8 @@ select:focus-visible {
   gap: 0.4rem;
 }
 
-.field label {
+.field label,
+.field-label {
   font-size: 0.8rem;
   font-weight: 750;
 }

@@ -61,6 +61,26 @@ export class IndexedDbService implements LocalRecordRepository {
     });
   }
 
+  async clear(kind: RecordKind): Promise<void> {
+    const database = await this.database();
+    const keys = await this.request<readonly IDBValidKey[]>((resolve, reject) => {
+      const request = database
+        .transaction(RECORD_STORE, 'readonly')
+        .objectStore(RECORD_STORE)
+        .index('kind')
+        .getAllKeys(kind);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await this.request<void>((resolve, reject) => {
+      const transaction = database.transaction(RECORD_STORE, 'readwrite');
+      const store = transaction.objectStore(RECORD_STORE);
+      for (const key of keys) store.delete(key);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
   private database(): Promise<IDBDatabase> {
     this.databasePromise ??= new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(DATABASE_NAME, 1);

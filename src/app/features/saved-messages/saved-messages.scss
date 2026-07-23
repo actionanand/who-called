@@ -239,10 +239,10 @@
 
 @media (min-width: 720px) {
   .editor {
-    inset: 4vh auto auto 50%;
+    inset: 4vh 1rem auto;
     width: min(38rem, calc(100% - 2rem));
     max-height: 92vh;
-    transform: translateX(-50%);
+    margin-inline: auto;
     border-radius: 1.5rem;
     box-shadow: 0 2rem 5rem rgb(0 0 0 / 35%);
   }

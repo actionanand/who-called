@@ -15,20 +15,23 @@
 
   <form class="card chat-form" [formGroup]="form" (ngSubmit)="openChat()">
     <div class="field">
-      <label for="country">Country or territory</label>
-      <select id="country" formControlName="country">
-        <option>India</option>
-        <option>United States</option>
-        <option>United Kingdom</option>
-        <option>United Arab Emirates</option>
-        <option>Singapore</option>
-        <option>Custom</option>
-      </select>
+      <span class="field-label">Country or territory</span>
+      <app-select-picker
+        [value]="form.controls.country.value"
+        [options]="countryOptions"
+        sheetTitle="Country or territory"
+        (valueChange)="selectCountry($event)"
+      />
     </div>
     <div class="phone-row">
       <div class="field code">
         <label for="wa-code">Code</label>
-        <input id="wa-code" formControlName="callingCode" inputmode="tel" />
+        <input
+          id="wa-code"
+          formControlName="callingCode"
+          inputmode="tel"
+          (blur)="normalizeCallingCode()"
+        />
       </div>
       <div class="field number">
         <label for="wa-number">Mobile number</label>

@@ -61,10 +61,13 @@
         <article class="contact-row">
           <span class="avatar">{{ contact.name.slice(0, 1).toUpperCase() }}</span>
           <span class="contact-copy">
-            <strong>{{ contact.name }}</strong>
+            <strong>{{ displayName(contact) }}</strong>
             <small>{{ contact.company || '+91 ' + formatPhone(contact.phone) }}</small>
           </span>
-          <a [href]="'tel:' + contact.normalizedPhone" [attr.aria-label]="'Call ' + contact.name">
+          <a
+            [href]="'tel:' + contact.normalizedPhone"
+            [attr.aria-label]="'Call ' + displayName(contact)"
+          >
             <app-icon name="phone" />
           </a>
         </article>

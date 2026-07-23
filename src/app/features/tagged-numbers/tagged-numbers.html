@@ -36,6 +36,16 @@
             >
           </div>
           <div class="actions">
+            <button
+              type="button"
+              aria-label="Convert tagged number to contact"
+              (click)="convertToContact(number)"
+            >
+              <app-icon name="user-plus" />
+            </button>
+            <button type="button" aria-label="Edit tagged number" (click)="openEditor(number)">
+              <app-icon name="edit" />
+            </button>
             <a
               [href]="'tel:' + number.normalizedPhone"
               [attr.aria-label]="'Call ' + number.normalizedPhone"
@@ -76,7 +86,7 @@
     <header>
       <div>
         <p>Unknown caller</p>
-        <h2 id="tag-editor-title">Tag a number</h2>
+        <h2 id="tag-editor-title">{{ editingNumber() ? 'Edit tagged number' : 'Tag a number' }}</h2>
       </div>
       <button type="button" aria-label="Close" (click)="editorOpen.set(false)">
         <app-icon name="close" />
@@ -99,11 +109,12 @@
       </div>
       <div class="field">
         <label for="number-tag">Tag</label>
-        <select id="number-tag" formControlName="tag">
-          @for (tag of tags; track tag) {
-            <option [value]="tag">{{ tag }}</option>
-          }
-        </select>
+        <app-select-picker
+          [value]="form.controls.tag.value"
+          [options]="tagOptions"
+          sheetTitle="Number tag"
+          (valueChange)="form.controls.tag.setValue($event)"
+        />
       </div>
       <div class="field">
         <label for="number-note">Short note <span>(optional)</span></label>
@@ -124,7 +135,7 @@
           Cancel
         </button>
         <button class="primary-button" type="submit">
-          <app-icon name="check" /> Encrypt & save
+          <app-icon name="check" /> {{ editingNumber() ? 'Update' : 'Encrypt & save' }}
         </button>
       </div>
     </form>

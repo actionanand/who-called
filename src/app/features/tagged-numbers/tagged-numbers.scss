@@ -86,6 +86,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
 }
 .actions a,
@@ -195,10 +196,10 @@
 
 @media (min-width: 720px) {
   .editor {
-    inset: 7vh auto auto 50%;
+    inset: 7vh 1rem auto;
     width: min(38rem, calc(100% - 2rem));
     max-height: 86vh;
-    transform: translateX(-50%);
+    margin-inline: auto;
     border-radius: 1.5rem;
     box-shadow: 0 2rem 5rem rgb(0 0 0 / 35%);
   }

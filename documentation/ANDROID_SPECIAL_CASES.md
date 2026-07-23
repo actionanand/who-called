@@ -2,6 +2,14 @@
 
 These Android surfaces appear before or outside Angular's WebView, so CSS alone cannot control them. `scripts/patch-android.mjs` applies the native parts after every Capacitor sync.
 
+## Biometric prompt
+
+The biometric prompt is an Android system surface and cannot be styled from Angular. Application
+Lock exposes the control only when the native bridge reports an enrolled strong biometric. The
+native bridge wraps the application PIN with an authentication-bound Android Keystore key and
+returns it to Angular only after a successful prompt. Cancellation leaves the application locked;
+adding or removing enrolled biometrics invalidates the key.
+
 ## Branded cold-start splash
 
 Android 12+ draws a system launch window before Angular, JavaScript, Capacitor plugins or the WebView exist. Who Called? applies the brand in three layers:

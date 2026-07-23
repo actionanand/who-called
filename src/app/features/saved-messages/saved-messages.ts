@@ -3,12 +3,25 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { AppStore } from '../../core/services/app-store.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 import { detectLikelyCode } from '../../core/utils/otp';
 import { AppIcon } from '../../shared/components/app-icon';
+import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
+
+const MESSAGE_CATEGORIES: readonly SelectPickerOption[] = [
+  'OTP',
+  'Delivery',
+  'Booking',
+  'Appointment',
+  'Payment',
+  'Account',
+  'Personal',
+  'Other',
+].map((value) => ({ value, label: value }));
 
 @Component({
   selector: 'app-saved-messages',
-  imports: [AppIcon, ReactiveFormsModule],
+  imports: [AppIcon, ReactiveFormsModule, SelectPicker],
   templateUrl: './saved-messages.html',
   styleUrl: './saved-messages.scss',
 })
@@ -16,10 +29,12 @@ export class SavedMessages {
   private readonly formBuilder = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly feedback = inject(FeedbackService);
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly detectedCode = signal('');
   protected readonly copied = signal('');
+  protected readonly categories = MESSAGE_CATEGORIES;
 
   protected readonly form = this.formBuilder.nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(120)]],
@@ -87,6 +102,13 @@ export class SavedMessages {
   }
 
   protected async remove(id: string, title: string): Promise<void> {
-    if (confirm(`Move “${title}” to trash?`)) await this.store.removeMessage(id);
+    const confirmed = await this.feedback.confirm({
+      title: 'Delete saved message?',
+      message: `“${title}” will be removed from your encrypted saved messages.`,
+      confirmLabel: 'Delete message',
+    });
+    if (!confirmed) return;
+    await this.store.removeMessage(id);
+    this.feedback.notify('Saved message deleted');
   }
 }

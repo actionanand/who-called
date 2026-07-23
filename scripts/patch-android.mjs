@@ -11,6 +11,7 @@ if (typeof appId !== 'string' || !appId.trim()) {
 
 const javaPath = resolve('android/app/src/main/java', ...appId.split('.'), 'MainActivity.java');
 const manifestPath = resolve('android/app/src/main/AndroidManifest.xml');
+const gradlePath = resolve('android/app/build.gradle');
 const resPath = resolve('android/app/src/main/res');
 const stylesPath = resolve(resPath, 'values/styles.xml');
 const nightStylesPath = resolve(resPath, 'values-night/styles.xml');
@@ -73,6 +74,15 @@ if (!manifest.includes('android.intent.action.SEND')) {
   );
 }
 await writeFile(manifestPath, manifest, 'utf8');
+
+let gradle = await readFile(gradlePath, 'utf8');
+if (!gradle.includes('androidx.biometric:biometric')) {
+  gradle = gradle.replace(
+    /dependencies\s*\{/,
+    "dependencies {\n    implementation 'androidx.biometric:biometric:1.1.0'",
+  );
+  await writeFile(gradlePath, gradle, 'utf8');
+}
 
 await mkdir(dirname(notificationIconPath), { recursive: true });
 await writeFile(
@@ -179,6 +189,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -188,9 +201,26 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.webkit.JavascriptInterface;
 
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+
 import com.getcapacitor.BridgeActivity;
 
+import org.json.JSONObject;
+
+import java.security.KeyStore;
+import java.util.concurrent.Executor;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+
 public class MainActivity extends BridgeActivity {
+  private static final boolean DEVICE_CALL_LOG_ENABLED = ${enableCallLog};
+  private static final String BIOMETRIC_KEY_ALIAS = "who_called_biometric_key";
+  private static final String SECURITY_PREFERENCES = "who_called_security";
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
   private boolean darkMode;
   private View launchOverlay;
@@ -263,10 +293,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     @JavascriptInterface
-    public void openWhatsApp(String number, String message) {
+    public void openWhatsApp(String number, String message, boolean businessFallback) {
       runOnUiThread(() -> {
         String url = "https://wa.me/" + number + (message.isEmpty() ? "" : "?text=" + Uri.encode(message));
-        String[] packages = { "com.whatsapp", "com.whatsapp.w4b" };
+        String[] packages = businessFallback
+          ? new String[] { "com.whatsapp", "com.whatsapp.w4b" }
+          : new String[] { "com.whatsapp" };
         for (String packageName : packages) {
           Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
           intent.setPackage(packageName);
@@ -283,6 +315,112 @@ public class MainActivity extends BridgeActivity {
     public void copyText(String value) {
       ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
       clipboard.setPrimaryClip(ClipData.newPlainText("Who Called", value));
+    }
+
+    @JavascriptInterface
+    public void setScreenshotProtection(boolean enabled) {
+      runOnUiThread(() -> {
+        if (enabled) {
+          getWindow().setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+          );
+        } else {
+          getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public boolean deviceCallHistorySupported() {
+      return DEVICE_CALL_LOG_ENABLED;
+    }
+
+    @JavascriptInterface
+    public String appVersion() {
+      return BuildConfig.VERSION_NAME;
+    }
+
+    @JavascriptInterface
+    public boolean isBiometricAvailable() {
+      return BiometricManager.from(MainActivity.this).canAuthenticate(
+        BiometricManager.Authenticators.BIOMETRIC_STRONG
+      ) == BiometricManager.BIOMETRIC_SUCCESS;
+    }
+
+    @JavascriptInterface
+    public void enableBiometric(String secret) {
+      runOnUiThread(() -> {
+        try {
+          byte[] plaintext = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+          Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+          cipher.init(Cipher.ENCRYPT_MODE, createBiometricKey());
+          showBiometricPrompt("Enable biometric unlock", cipher, () -> {
+            try {
+              byte[] encrypted = cipher.doFinal(plaintext);
+              getSharedPreferences(SECURITY_PREFERENCES, MODE_PRIVATE).edit()
+                .putString("wrapped_secret", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString("wrapped_iv", Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP))
+                .apply();
+              java.util.Arrays.fill(plaintext, (byte) 0);
+              dispatchNativeResult("biometric-enabled", true, "", "");
+            } catch (Exception error) {
+              dispatchNativeResult("biometric-enabled", false, "", error.getMessage());
+            }
+          }, "biometric-enabled");
+        } catch (Exception error) {
+          dispatchNativeResult("biometric-enabled", false, "", error.getMessage());
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void authenticateBiometric() {
+      runOnUiThread(() -> {
+        try {
+          String wrapped = getSharedPreferences(SECURITY_PREFERENCES, MODE_PRIVATE)
+            .getString("wrapped_secret", null);
+          String iv = getSharedPreferences(SECURITY_PREFERENCES, MODE_PRIVATE)
+            .getString("wrapped_iv", null);
+          if (wrapped == null || iv == null) {
+            throw new IllegalStateException("Biometric unlock is not configured on this device.");
+          }
+          KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+          keyStore.load(null);
+          SecretKey key = (SecretKey) keyStore.getKey(BIOMETRIC_KEY_ALIAS, null);
+          if (key == null) throw new IllegalStateException("Enable biometric unlock again.");
+          Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+          cipher.init(
+            Cipher.DECRYPT_MODE,
+            key,
+            new GCMParameterSpec(128, Base64.decode(iv, Base64.DEFAULT))
+          );
+          showBiometricPrompt("Unlock Who Called?", cipher, () -> {
+            try {
+              byte[] raw = cipher.doFinal(Base64.decode(wrapped, Base64.DEFAULT));
+              String secret = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+              java.util.Arrays.fill(raw, (byte) 0);
+              dispatchNativeResult("biometric-unlock", true, secret, "");
+            } catch (Exception error) {
+              dispatchNativeResult("biometric-unlock", false, "", error.getMessage());
+            }
+          }, "biometric-unlock");
+        } catch (Exception error) {
+          dispatchNativeResult("biometric-unlock", false, "", error.getMessage());
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void disableBiometric() {
+      try {
+        getSharedPreferences(SECURITY_PREFERENCES, MODE_PRIVATE).edit().clear().apply();
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+        if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+          keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+        }
+      } catch (Exception ignored) { }
     }
   }
 
@@ -321,6 +459,78 @@ public class MainActivity extends BridgeActivity {
 
   private int dp(int value) {
     return Math.round(value * getResources().getDisplayMetrics().density);
+  }
+
+  private SecretKey createBiometricKey() throws Exception {
+    KeyGenerator generator = KeyGenerator.getInstance(
+      KeyProperties.KEY_ALGORITHM_AES,
+      "AndroidKeyStore"
+    );
+    KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(
+      BIOMETRIC_KEY_ALIAS,
+      KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
+    ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+      .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+      .setUserAuthenticationRequired(true)
+      .setInvalidatedByBiometricEnrollment(true);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      builder.setUserAuthenticationParameters(
+        0,
+        KeyProperties.AUTH_BIOMETRIC_STRONG
+      );
+    } else {
+      builder.setUserAuthenticationValidityDurationSeconds(-1);
+    }
+    generator.init(builder.build());
+    return generator.generateKey();
+  }
+
+  private void showBiometricPrompt(
+    String title,
+    Cipher cipher,
+    Runnable success,
+    String action
+  ) {
+    Executor executor = ContextCompat.getMainExecutor(this);
+    BiometricPrompt prompt = new BiometricPrompt(
+      this,
+      executor,
+      new BiometricPrompt.AuthenticationCallback() {
+        @Override
+        public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+          success.run();
+        }
+
+        @Override
+        public void onAuthenticationError(int code, CharSequence message) {
+          dispatchNativeResult(action, false, "", message.toString());
+        }
+      }
+    );
+    BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+      .setTitle(title)
+      .setSubtitle("Confirm your identity on this device")
+      .setNegativeButtonText("Cancel")
+      .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+      .build();
+    prompt.authenticate(info, new BiometricPrompt.CryptoObject(cipher));
+  }
+
+  private void dispatchNativeResult(
+    String action,
+    boolean success,
+    String data,
+    String message
+  ) {
+    runOnUiThread(() -> {
+      String script = "window.dispatchEvent(new CustomEvent('who-called-native-result',{detail:{"
+        + "action:" + JSONObject.quote(action) + ","
+        + "success:" + success + ","
+        + "data:" + JSONObject.quote(data == null ? "" : data) + ","
+        + "message:" + JSONObject.quote(message == null ? "" : message)
+        + "}}));";
+      getBridge().getWebView().evaluateJavascript(script, null);
+    });
   }
 
   @SuppressWarnings("deprecation")

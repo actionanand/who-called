@@ -1,5 +1,33 @@
 export type ThemePreference = 'light' | 'dark' | 'automatic';
 
+export interface ContactPhone {
+  readonly id: string;
+  readonly type: string;
+  readonly callingCode: string;
+  readonly number: string;
+  readonly normalizedNumber: string;
+  readonly whatsappEnabled: boolean;
+}
+
+export interface ContactEmail {
+  readonly id: string;
+  readonly type: string;
+  readonly value: string;
+}
+
+export interface ContactSocial {
+  readonly id: string;
+  readonly platform: string;
+  readonly url: string;
+}
+
+export interface ContactBirthDate {
+  readonly mode: 'month-day' | 'full';
+  readonly month: number;
+  readonly day: number;
+  readonly year?: number;
+}
+
 export interface PrivateContact {
   readonly id: string;
   readonly name: string;
@@ -8,7 +36,12 @@ export interface PrivateContact {
   readonly normalizedPhone: string;
   readonly whatsappEnabled: boolean;
   readonly favorite: boolean;
+  readonly hidden?: boolean;
   readonly notes: string;
+  readonly phones?: readonly ContactPhone[];
+  readonly emails?: readonly ContactEmail[];
+  readonly socialLinks?: readonly ContactSocial[];
+  readonly birthDate?: ContactBirthDate;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -42,6 +75,14 @@ export interface AppSettings {
   readonly defaultCallingCode: string;
   readonly recentActivityEnabled: boolean;
   readonly whatsappBusinessFallback: boolean;
+  readonly deviceCallHistoryEnabled: boolean;
+  readonly screenshotProtection: boolean;
+  readonly pinEnabled: boolean;
+  readonly pinSalt?: string;
+  readonly pinVerifier?: string;
+  readonly pinIterations?: number;
+  readonly biometricEnabled: boolean;
+  readonly hideHiddenContacts: boolean;
 }
 
 export type RecordKind = 'contact' | 'message' | 'tagged-number' | 'settings';

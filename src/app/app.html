@@ -41,6 +41,40 @@
     <app-icon name="plus" />
   </button>
 </div>
+<app-feedback />
+
+@if (store.locked()) {
+  <section class="lock-screen" role="dialog" aria-modal="true" aria-labelledby="unlock-title">
+    <img ngSrc="/who-called.png" width="72" height="72" priority alt="" />
+    <div>
+      <p class="eyebrow">Private contact space</p>
+      <h1 id="unlock-title">Who Called? is locked</h1>
+      <p>Enter your application PIN to continue.</p>
+    </div>
+    <form (ngSubmit)="unlock()">
+      <label for="unlock-pin">Application PIN</label>
+      <input
+        id="unlock-pin"
+        type="password"
+        inputmode="numeric"
+        maxlength="8"
+        autocomplete="current-password"
+        [ngModel]="unlockPin()"
+        (ngModelChange)="unlockPin.set($event)"
+        name="unlockPin"
+      />
+      @if (unlockError()) {
+        <small>{{ unlockError() }}</small>
+      }
+      <button class="primary-button" type="submit">Unlock</button>
+      @if (biometricAvailable()) {
+        <button class="secondary-button" type="button" (click)="unlockWithBiometric()">
+          <app-icon name="biometric" /> Unlock with biometrics
+        </button>
+      }
+    </form>
+  </section>
+}
 
 @if (store.quickActionsOpen()) {
   <button

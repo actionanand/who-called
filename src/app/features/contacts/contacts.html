@@ -15,7 +15,7 @@
     <input
       #searchInput
       type="search"
-      placeholder="Search name, company, number or note"
+      placeholder="Search name, number, email or note"
       (input)="search.set(searchInput.value)"
     />
   </label>
@@ -36,12 +36,25 @@
           <div class="avatar" aria-hidden="true">{{ contact.name.slice(0, 1).toUpperCase() }}</div>
           <div class="copy">
             <span class="name-line">
-              <strong>{{ contact.name }}</strong>
+              <strong>{{ displayName(contact) }}</strong>
               @if (contact.favorite) {
                 <app-icon name="favorite" />
               }
+              @if (contact.hidden) {
+                <button
+                  class="name-reveal-button"
+                  type="button"
+                  aria-label="Show hidden contact name for 5 seconds"
+                  (click)="revealHiddenName(contact)"
+                >
+                  <app-icon [name]="revealedNames().has(contact.id) ? 'eye' : 'eye-off'" />
+                </button>
+              }
             </span>
             <small>{{ contact.company || '+91 ' + formatPhone(contact.phone) }}</small>
+            @if (age(contact); as currentAge) {
+              <span class="age"><app-icon name="birthday" /> {{ currentAge }} years old</span>
+            }
             @if (contact.notes) {
               <p>{{ contact.notes }}</p>
             }
@@ -52,17 +65,28 @@
                 [href]="'https://wa.me/' + contact.normalizedPhone.slice(1)"
                 target="_blank"
                 rel="noopener"
-                [attr.aria-label]="'Open WhatsApp chat with ' + contact.name"
-                ><app-icon name="message"
-              /></a>
+                [attr.aria-label]="'Open WhatsApp chat with ' + displayName(contact)"
+              >
+                <app-icon name="message" />
+              </a>
             }
-            <a [href]="'tel:' + contact.normalizedPhone" [attr.aria-label]="'Call ' + contact.name">
+            <a
+              [href]="'tel:' + contact.normalizedPhone"
+              [attr.aria-label]="'Call ' + displayName(contact)"
+            >
               <app-icon name="phone" />
             </a>
             <button
               type="button"
-              [attr.aria-label]="'Delete ' + contact.name"
-              (click)="remove(contact.id, contact.name)"
+              [attr.aria-label]="'Edit ' + displayName(contact)"
+              (click)="openEditor(contact)"
+            >
+              <app-icon name="edit" />
+            </button>
+            <button
+              type="button"
+              [attr.aria-label]="'Delete ' + displayName(contact)"
+              (click)="remove(contact.id, displayName(contact))"
             >
               <app-icon name="trash" />
             </button>
@@ -77,7 +101,7 @@
       <p>
         {{
           search()
-            ? 'Try a name, company, note, or part of a phone number.'
+            ? 'Try a name, email, social profile, note, or part of a phone number.'
             : 'Contacts saved here do not appear in Android Contacts.'
         }}
       </p>
@@ -101,14 +125,38 @@
     <header>
       <div>
         <p>Private contact</p>
-        <h2 id="contact-editor-title">Add a contact</h2>
+        <h2 id="contact-editor-title">{{ editingContact() ? 'Edit contact' : 'Add a contact' }}</h2>
       </div>
-      <button type="button" aria-label="Close" (click)="closeEditor()">
-        <app-icon name="close" />
-      </button>
+      <div class="header-actions">
+        <button
+          class="favorite-button"
+          type="button"
+          [class.selected]="form.controls.favorite.value"
+          [attr.aria-pressed]="form.controls.favorite.value"
+          aria-label="Toggle favourite"
+          (click)="toggleFavorite()"
+        >
+          <app-icon name="favorite" />
+        </button>
+        <button
+          class="visibility-button"
+          type="button"
+          [class.selected]="form.controls.hidden.value"
+          [attr.aria-pressed]="form.controls.hidden.value"
+          [attr.aria-label]="form.controls.hidden.value ? 'Unhide contact' : 'Hide contact'"
+          (click)="toggleHidden()"
+        >
+          <app-icon [name]="form.controls.hidden.value ? 'eye-off' : 'eye'" />
+        </button>
+        <button type="button" aria-label="Close" (click)="closeEditor()">
+          <app-icon name="close" />
+        </button>
+      </div>
     </header>
+
     <form [formGroup]="form" (ngSubmit)="save()">
       <div class="avatar-picker" aria-hidden="true"><app-icon name="user-plus" /></div>
+
       <div class="field">
         <label for="contact-name">Contact name</label>
         <input
@@ -121,6 +169,7 @@
           <small class="error">Enter a contact name.</small>
         }
       </div>
+
       <div class="field">
         <label for="contact-company">Company <span>(optional)</span></label>
         <input
@@ -130,26 +179,176 @@
           placeholder="Company or organisation"
         />
       </div>
-      <div class="phone-grid">
-        <div class="field code-field">
-          <label for="calling-code">Code</label>
-          <input id="calling-code" value="+91" readonly aria-readonly="true" />
-        </div>
-        <div class="field">
-          <label for="contact-phone">Mobile number</label>
-          <input
-            id="contact-phone"
-            formControlName="phone"
-            type="tel"
-            inputmode="tel"
-            autocomplete="tel-national"
-            placeholder="98765 43210"
-          />
-          @if (form.controls.phone.touched && form.controls.phone.invalid) {
-            <small class="error">Enter a valid phone number.</small>
-          }
-        </div>
-      </div>
+
+      <fieldset formArrayName="phones" class="repeat-group">
+        <legend>Phone numbers</legend>
+        @for (phone of phones.controls; track phone.controls.id.value; let index = $index) {
+          <div class="repeat-card" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Phone {{ index + 1 }}</strong>
+              @if (phones.length > 1) {
+                <button type="button" aria-label="Remove phone number" (click)="removePhone(index)">
+                  <app-icon name="close" />
+                </button>
+              }
+            </div>
+            <div class="field">
+              <span class="field-label">Type</span>
+              <app-select-picker
+                [value]="phone.controls.type.value"
+                [options]="phoneTypes"
+                sheetTitle="Phone number type"
+                (valueChange)="setPickerValue(phone.controls.type, $event)"
+              />
+            </div>
+            <div class="phone-grid">
+              <div class="field code-field">
+                <label [for]="'calling-code-' + index">Code</label>
+                <input
+                  [id]="'calling-code-' + index"
+                  formControlName="callingCode"
+                  inputmode="tel"
+                />
+              </div>
+              <div class="field">
+                <label [for]="'contact-phone-' + index">Number</label>
+                <input
+                  [id]="'contact-phone-' + index"
+                  formControlName="number"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel-national"
+                  placeholder="98765 43210"
+                />
+              </div>
+            </div>
+            <label class="inline-check">
+              <input type="checkbox" formControlName="whatsappEnabled" />
+              <span>This number uses WhatsApp</span>
+            </label>
+          </div>
+        }
+        <button class="add-field-button" type="button" (click)="addPhone()">
+          <app-icon name="plus" /> Add phone number
+        </button>
+      </fieldset>
+
+      <fieldset formArrayName="emails" class="repeat-group">
+        <legend>Email addresses</legend>
+        @for (email of emails.controls; track email.controls.id.value; let index = $index) {
+          <div class="repeat-card compact" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Email {{ index + 1 }}</strong>
+              <button type="button" aria-label="Remove email address" (click)="removeEmail(index)">
+                <app-icon name="close" />
+              </button>
+            </div>
+            <div class="two-column">
+              <app-select-picker
+                [value]="email.controls.type.value"
+                [options]="emailTypes"
+                sheetTitle="Email type"
+                (valueChange)="setPickerValue(email.controls.type, $event)"
+              />
+              <div class="field">
+                <label class="visually-hidden" [for]="'contact-email-' + index"
+                  >Email address</label
+                >
+                <input
+                  [id]="'contact-email-' + index"
+                  formControlName="value"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="name@example.com"
+                />
+              </div>
+            </div>
+          </div>
+        }
+        <button class="add-field-button" type="button" (click)="addEmail()">
+          <app-icon name="plus" /> Add email
+        </button>
+      </fieldset>
+
+      <fieldset formArrayName="socialLinks" class="repeat-group">
+        <legend>Social media & websites</legend>
+        @for (link of socialLinks.controls; track link.controls.id.value; let index = $index) {
+          <div class="repeat-card compact" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Link {{ index + 1 }}</strong>
+              <button
+                type="button"
+                aria-label="Remove social media link"
+                (click)="removeSocial(index)"
+              >
+                <app-icon name="close" />
+              </button>
+            </div>
+            <app-select-picker
+              [value]="link.controls.platform.value"
+              [options]="socialTypes"
+              sheetTitle="Social platform"
+              (valueChange)="setPickerValue(link.controls.platform, $event)"
+            />
+            <div class="field">
+              <label class="visually-hidden" [for]="'social-url-' + index">Profile URL</label>
+              <input
+                [id]="'social-url-' + index"
+                formControlName="url"
+                type="url"
+                inputmode="url"
+                placeholder="https://…"
+              />
+            </div>
+          </div>
+        }
+        <button class="add-field-button" type="button" (click)="addSocial()">
+          <app-icon name="plus" /> Add social link
+        </button>
+      </fieldset>
+
+      <fieldset class="repeat-group birthday-group">
+        <legend>Date of birth</legend>
+        <app-select-picker
+          [value]="form.controls.dobMode.value"
+          [options]="dobModes"
+          sheetTitle="Date of birth format"
+          (valueChange)="setPickerValue(form.controls.dobMode, $event)"
+        />
+        @if (form.controls.dobMode.value === 'month-day') {
+          <div class="two-column">
+            <div class="field">
+              <label for="dob-month">Month</label>
+              <input
+                id="dob-month"
+                formControlName="dobMonth"
+                type="number"
+                min="1"
+                max="12"
+                inputmode="numeric"
+              />
+            </div>
+            <div class="field">
+              <label for="dob-day">Day</label>
+              <input
+                id="dob-day"
+                formControlName="dobDay"
+                type="number"
+                min="1"
+                max="31"
+                inputmode="numeric"
+              />
+            </div>
+          </div>
+        } @else if (form.controls.dobMode.value === 'full') {
+          <div class="field">
+            <label for="dob-full">Full date of birth</label>
+            <input id="dob-full" formControlName="dobFull" type="date" />
+            <small>The current age appears below the contact preview.</small>
+          </div>
+        }
+      </fieldset>
+
       <div class="field">
         <label for="contact-notes">Private note <span>(optional)</span></label>
         <textarea
@@ -158,18 +357,12 @@
           placeholder="How you know this person, follow-up details…"
         ></textarea>
       </div>
-      <label class="toggle-row">
-        <span><strong>WhatsApp enabled</strong><small>Show the WhatsApp shortcut</small></span>
-        <input type="checkbox" formControlName="whatsappEnabled" />
-      </label>
-      <label class="toggle-row">
-        <span><strong>Add to favourites</strong><small>Show on your home screen</small></span>
-        <input type="checkbox" formControlName="favorite" />
-      </label>
+
       <div class="form-actions">
         <button class="secondary-button" type="button" (click)="closeEditor()">Cancel</button>
         <button class="primary-button" type="submit" [disabled]="saving()">
-          <app-icon name="check" /> {{ saving() ? 'Encrypting…' : 'Save contact' }}
+          <app-icon name="check" />
+          {{ saving() ? 'Encrypting…' : editingContact() ? 'Update contact' : 'Save contact' }}
         </button>
       </div>
     </form>

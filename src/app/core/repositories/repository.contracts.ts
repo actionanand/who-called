@@ -6,6 +6,7 @@ export interface LocalRecordRepository {
   list<T>(kind: RecordKind): Promise<readonly T[]>;
   put<T extends { readonly id: string }>(kind: RecordKind, value: T): Promise<void>;
   remove(kind: RecordKind, id: string): Promise<void>;
+  clear(kind: RecordKind): Promise<void>;
 }
 
 export interface CallHistoryProvider {

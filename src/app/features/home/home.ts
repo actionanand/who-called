@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AppStore } from '../../core/services/app-store.service';
 import { AppIcon } from '../../shared/components/app-icon';
 import { formatIndianPhone } from '../../core/utils/phone-number';
+import { contactDisplayName } from '../../core/utils/contact-privacy';
 
 @Component({
   selector: 'app-home',
@@ -13,4 +14,5 @@ import { formatIndianPhone } from '../../core/utils/phone-number';
 export class Home {
   protected readonly store = inject(AppStore);
   protected readonly formatPhone = formatIndianPhone;
+  protected readonly displayName = contactDisplayName;
 }

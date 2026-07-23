@@ -86,16 +86,12 @@
       </div>
       <div class="field">
         <label for="message-category">Category</label>
-        <select id="message-category" formControlName="category">
-          <option>OTP</option>
-          <option>Delivery</option>
-          <option>Booking</option>
-          <option>Appointment</option>
-          <option>Payment</option>
-          <option>Account</option>
-          <option>Personal</option>
-          <option>Other</option>
-        </select>
+        <app-select-picker
+          [value]="form.controls.category.value"
+          [options]="categories"
+          sheetTitle="Message category"
+          (valueChange)="form.controls.category.setValue($event)"
+        />
       </div>
       <div class="field">
         <span class="label-row"

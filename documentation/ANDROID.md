@@ -4,16 +4,16 @@ Who Called? uses Capacitor and GitHub Actions to package the Angular application
 
 ## Build files
 
-| File                                  | Purpose                                                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `capacitor.config.ts`                 | App ID, name, Angular output directory, splash and notification defaults                                      |
-| `.github/workflows/android-build.yml` | Lints, tests, builds, signs, verifies and uploads Android artifacts                                           |
-| `android-version.json`                | Android `versionCode` and `versionName`                                                                       |
-| `scripts/bump-android-version.js`     | Increments Android versions                                                                                   |
-| `scripts/patch-android.mjs`           | Applies splash, share-target, optional permission, notification-icon and light/dark system-bar native changes |
-| `scripts/generate-keystore.mjs`       | Creates a PKCS12 release keystore                                                                             |
-| `scripts/detect-keystore-format.mjs`  | Reports a keystore's internal format                                                                          |
-| `public/who-called.png`               | Canonical launcher, splash and Play Store icon source                                                         |
+| File                                  | Purpose                                                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `capacitor.config.ts`                 | App ID, name, Angular output directory, splash and notification defaults                                                        |
+| `.github/workflows/android-build.yml` | Lints, tests, builds, signs, verifies and uploads Android artifacts                                                             |
+| `android-version.json`                | Android `versionCode` and `versionName`                                                                                         |
+| `scripts/bump-android-version.js`     | Increments Android versions                                                                                                     |
+| `scripts/patch-android.mjs`           | Applies splash, share-target, biometric unlock, optional permission, notification-icon and light/dark system-bar native changes |
+| `scripts/generate-keystore.mjs`       | Creates a PKCS12 release keystore                                                                                               |
+| `scripts/detect-keystore-format.mjs`  | Reports a keystore's internal format                                                                                            |
+| `public/who-called.png`               | Canonical launcher, splash and Play Store icon source                                                                           |
 
 ## Local workflow
 
@@ -30,6 +30,17 @@ npm run android:sync
 ```bash
 npm run android:open
 ```
+
+## Biometric application unlock
+
+Biometric unlock is available only in the generated Android application and requires an
+application PIN plus an enrolled strong biometric. The native patch adds AndroidX Biometric and
+stores the PIN only as AES-GCM ciphertext protected by a non-exportable, authentication-bound
+Android Keystore key. A biometric enrollment change invalidates that key, after which the user must
+unlock with the PIN and enable biometrics again.
+
+Run `npm run android:sync` after changing the native patch. No separate JavaScript package is
+required.
 
 If `android/` does not exist, `npx cap sync android` reporting a missing platform is expected; run `npm run android:add` first.
 
