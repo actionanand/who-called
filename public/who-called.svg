@@ -1,0 +1,104 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- subtle shadow filter -->
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="6" dy="10" stdDeviation="6" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- ===================== PHONE ICON ===================== -->
+  <g filter="url(#softShadow)">
+    <!-- darker green back circle (3D offset) -->
+    <circle cx="527" cy="245" r="197" fill="#3fae2a"/>
+    <!-- main green circle -->
+    <circle cx="508" cy="245" r="197" fill="#7ed321"/>
+    <!-- phone handset glyph (clean, accurate silhouette) -->
+    <g transform="translate(388,125) scale(10)">
+      <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"
+            fill="#ffffff"/>
+    </g>
+  </g>
+
+  <!-- ===================== "WHO" RED RIBBON ===================== -->
+  <g filter="url(#softShadow)">
+    <!-- shadow/dark red offset for slanted 3D edge -->
+    <polygon points="150,438 812,438 782,648 120,648" fill="#b8241a"/>
+    <!-- right-end side wedge showing ribbon thickness (follows the rounded cap curve) -->
+    <path d="
+      M 792 438
+      Q 806 438 803 452
+      L 780 636
+      Q 777 650 763 650
+      L 787 660
+      Q 801 660 804 646
+      L 827 462
+      Q 830 448 816 448
+      Z"
+      fill="#a81e14"/>
+    <!-- main red ribbon (slanted parallelogram with rounded ends) -->
+    <path d="
+      M 168 438
+      L 792 438
+      Q 806 438 803 452
+      L 780 636
+      Q 777 650 763 650
+      L 102 650
+      Q 88 650 91 636
+      L 137 452
+      Q 140 438 154 438
+      Z"
+      fill="#ee3124"/>
+    <!-- WHO text with 3D extrusion -->
+    <g font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="150" text-anchor="middle" letter-spacing="4">
+      <text x="454" y="597" fill="#8f1710">WHO</text>
+      <text x="453" y="596" fill="#951911">WHO</text>
+      <text x="452" y="595" fill="#9b1b12">WHO</text>
+      <text x="451" y="594" fill="#a11d13">WHO</text>
+      <text x="450" y="593" fill="#a71f14">WHO</text>
+      <text x="449" y="592" fill="#ad2115">WHO</text>
+      <text x="448" y="591" fill="#b32316">WHO</text>
+      <text x="447" y="590" fill="#ffffff">WHO</text>
+    </g>
+  </g>
+
+  <!-- ===================== "CALLED" WHITE RIBBON ===================== -->
+  <g filter="url(#softShadow)">
+    <!-- shadow offset (visible sliver along right + bottom edges) -->
+    <polygon points="266,650 938,650 900,860 228,860" fill="#c9c9c9"/>
+    <!-- right-end side wedge showing card thickness (follows the rounded cap curve) -->
+    <path d="
+      M 918 650
+      Q 932 650 929 664
+      L 897 828
+      Q 894 842 880 842
+      L 902 852
+      Q 916 852 919 838
+      L 951 674
+      Q 954 660 940 660
+      Z"
+      fill="#bdbdbd"/>
+    <!-- main white ribbon -->
+    <path d="
+      M 266 650
+      L 918 650
+      Q 932 650 929 664
+      L 897 828
+      Q 894 842 880 842
+      L 228 842
+      Q 214 842 217 828
+      L 249 664
+      Q 252 650 266 650
+      Z"
+      fill="#ffffff"/>
+    <!-- CALLED text with 3D extrusion -->
+    <g font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="120" text-anchor="middle" letter-spacing="4">
+      <text x="579" y="784" fill="#c3c3c3">CALLED</text>
+      <text x="578" y="783" fill="#cacaca">CALLED</text>
+      <text x="577" y="782" fill="#d1d1d1">CALLED</text>
+      <text x="576" y="781" fill="#d8d8d8">CALLED</text>
+      <text x="575" y="780" fill="#dfdfdf">CALLED</text>
+      <text x="574" y="779" fill="#e6e6e6">CALLED</text>
+      <text x="573" y="778" fill="#ee3124">CALLED</text>
+    </g>
+  </g>
+</svg>
