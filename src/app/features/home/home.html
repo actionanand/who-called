@@ -14,35 +14,6 @@
   </a>
 
   <div class="section-title">
-    <h2>Quick actions</h2>
-    <button class="text-link" type="button" (click)="store.quickActionsOpen.set(true)">
-      View all
-    </button>
-  </div>
-  <section class="quick-grid" aria-label="Quick actions">
-    <a routerLink="/whatsapp" class="quick-card whatsapp">
-      <span><app-icon name="message" /></span>
-      <strong>WhatsApp</strong>
-      <small>Chat without saving</small>
-    </a>
-    <a routerLink="/contacts" [queryParams]="{ add: 1 }" class="quick-card contact">
-      <span><app-icon name="user-plus" /></span>
-      <strong>Add contact</strong>
-      <small>Private address book</small>
-    </a>
-    <a href="tel:" class="quick-card call">
-      <span><app-icon name="phone" /></span>
-      <strong>Make a call</strong>
-      <small>Open the dialler</small>
-    </a>
-    <a routerLink="/messages" [queryParams]="{ add: 1 }" class="quick-card saved">
-      <span><app-icon name="bookmark-plus" /></span>
-      <strong>Save message</strong>
-      <small>Keep a code or note</small>
-    </a>
-  </section>
-
-  <div class="section-title">
     <h2>Recent contacts</h2>
     <a class="text-link" routerLink="/contacts">See all</a>
   </div>
@@ -85,17 +56,108 @@
   </section>
 
   <div class="section-title">
-    <h2>Recent activity</h2>
+    <h2>Phone call history</h2>
     <a class="text-link" routerLink="/tagged">Tagged numbers</a>
   </div>
-  <section class="card activity-card">
-    <span class="activity-icon"><app-icon name="offline" /></span>
-    <div>
-      <strong>Permission-free by design</strong>
-      <p>
-        Calls and chats opened from Who Called? will appear here. Device call history is optional.
-      </p>
-    </div>
+  <section class="card call-history" aria-label="Phone call history">
+    @if (!callHistorySupported) {
+      <div class="activity-card">
+        <span class="activity-icon"><app-icon name="smartphone" /></span>
+        <div>
+          <strong>Available in the Android application</strong>
+          <p>Install the Android build to view call history stored on this phone.</p>
+        </div>
+      </div>
+    } @else if (!store.settings().deviceCallHistoryEnabled) {
+      <div class="activity-card">
+        <span class="activity-icon"><app-icon name="phone" /></span>
+        <div>
+          <strong>Show phone call history</strong>
+          <p>Enable this feature and allow Android call-log access on this device.</p>
+          <button
+            class="secondary-button history-button"
+            type="button"
+            (click)="enableCallHistory()"
+          >
+            Enable call history
+          </button>
+        </div>
+      </div>
+    } @else if (callHistoryLoading()) {
+      <div class="loading-row">
+        <span></span>
+        <div><i></i><i></i></div>
+      </div>
+      <div class="loading-row">
+        <span></span>
+        <div><i></i><i></i></div>
+      </div>
+    } @else if (callHistoryError()) {
+      <div class="activity-card">
+        <span class="activity-icon"><app-icon name="phone" /></span>
+        <div>
+          <strong>Call history needs permission</strong>
+          <p>{{ callHistoryError() }}</p>
+          <button class="secondary-button history-button" type="button" (click)="loadCallHistory()">
+            Try again
+          </button>
+        </div>
+      </div>
+    } @else if (enrichedCallHistory().length) {
+      @for (call of enrichedCallHistory(); track call.id) {
+        <article class="history-row">
+          <span class="call-kind" [class.missed]="call.type === 'missed'">
+            <app-icon name="phone" />
+          </span>
+          <span class="history-copy">
+            <strong>{{ call.displayName }}</strong>
+            <small>
+              {{ displayPhone(call.number) }} · {{ callTypeLabel(call) }} ·
+              {{ callTime(call.timestamp) }}
+              @if (duration(call.durationSeconds)) {
+                · {{ duration(call.durationSeconds) }}
+              }
+            </small>
+            @if (call.taggedNumber; as tagged) {
+              <span class="history-tag"><app-icon name="tag" /> {{ tagged.tag }}</span>
+            }
+          </span>
+          <span class="history-actions">
+            @if (!call.contact && hasDialableNumber(call.number)) {
+              <button
+                type="button"
+                [attr.aria-label]="'Save ' + displayPhone(call.number) + ' as a contact'"
+                (click)="saveAsContact(call)"
+              >
+                <app-icon name="user-plus" />
+              </button>
+            }
+            @if (!call.taggedNumber && hasDialableNumber(call.number)) {
+              <button
+                type="button"
+                [attr.aria-label]="'Tag ' + displayPhone(call.number)"
+                (click)="tagCall(call)"
+              >
+                <app-icon name="tag" />
+              </button>
+            }
+            @if (hasDialableNumber(call.number)) {
+              <a [href]="'tel:' + call.number" [attr.aria-label]="'Call ' + call.displayName">
+                <app-icon name="phone" />
+              </a>
+            }
+          </span>
+        </article>
+      }
+    } @else {
+      <div class="activity-card">
+        <span class="activity-icon"><app-icon name="phone" /></span>
+        <div>
+          <strong>No calls found</strong>
+          <p>New incoming, outgoing and missed calls will appear here.</p>
+        </div>
+      </div>
+    }
   </section>
 
   <section class="privacy-note">

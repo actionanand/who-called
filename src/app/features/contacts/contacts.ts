@@ -304,10 +304,10 @@ export class Contacts {
       else {
         await this.store.addContact(contact);
         const draft = this.store.pendingContactDraft();
-        if (draft) {
+        if (draft?.taggedNumberId) {
           await this.store.removeTaggedNumber(draft.taggedNumberId);
-          this.store.pendingContactDraft.set(null);
         }
+        this.store.pendingContactDraft.set(null);
       }
       this.closeEditor();
       this.feedback.notify(existing ? 'Contact updated' : 'Contact saved');

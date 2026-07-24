@@ -69,6 +69,18 @@ export interface TaggedNumber {
   readonly createdAt: string;
 }
 
+export type DeviceCallType =
+  'incoming' | 'outgoing' | 'missed' | 'rejected' | 'blocked' | 'voicemail' | 'unknown';
+
+export interface DeviceCallHistoryEntry {
+  readonly id: string;
+  readonly number: string;
+  readonly cachedName: string;
+  readonly type: DeviceCallType;
+  readonly timestamp: number;
+  readonly durationSeconds: number;
+}
+
 export interface AppSettings {
   readonly theme: ThemePreference;
   readonly defaultCountry: string;

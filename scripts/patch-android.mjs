@@ -29,7 +29,7 @@ const splashSourcePath = resolve('public/who-called.png');
 const splashLogoPath = resolve(resPath, 'drawable-nodpi/who_called_splash_logo.png');
 const splashIconPath = resolve(resPath, 'drawable/who_called_splash_icon.xml');
 const splashPath = resolve(resPath, 'drawable/splash.xml');
-const enableCallLog = process.env.ENABLE_DEVICE_CALL_LOG === 'true';
+const enableCallLog = process.env.ENABLE_DEVICE_CALL_LOG !== 'false';
 
 await access(javaPath).catch(() => {
   throw new Error(`Android project file not found: ${javaPath}. Run "npx cap add android" first.`);
@@ -55,6 +55,17 @@ if (!enableCallLog) {
   manifest = manifest.replace(
     /\s*<uses-permission android:name="android\.permission\.READ_CALL_LOG"\s*\/>/g,
     '',
+  );
+}
+
+if (!manifest.includes('com.whatsapp.w4b')) {
+  manifest = manifest.replace(
+    '</manifest>',
+    `    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
+</manifest>`,
   );
 }
 
@@ -205,12 +216,15 @@ await ensureThemes(nightStylesPath, true);
 
 const source = `package ${appId};
 
+import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -228,6 +242,7 @@ import android.view.WindowInsetsController;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.webkit.JavascriptInterface;
+import android.provider.CallLog;
 
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
@@ -235,6 +250,7 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.security.KeyStore;
@@ -247,6 +263,7 @@ import javax.crypto.spec.GCMParameterSpec;
 
 public class MainActivity extends BridgeActivity {
   private static final boolean DEVICE_CALL_LOG_ENABLED = ${enableCallLog};
+  private static final int CALL_LOG_PERMISSION_REQUEST = 4801;
   private static final String BIOMETRIC_KEY_ALIAS = "who_called_biometric_key";
   private static final String SECURITY_PREFERENCES = "who_called_security";
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -264,6 +281,10 @@ public class MainActivity extends BridgeActivity {
     showLaunchOverlay();
     getBridge().getWebView().addJavascriptInterface(new WhoCalledNativeBridge(), "WhoCalledNative");
     getBridge().getWebView().addJavascriptInterface(new SystemBarsBridge(), "WhoCalledSystemBars");
+    getWindow().setBackgroundDrawable(
+      new android.graphics.drawable.ColorDrawable(Color.parseColor("#0E1713"))
+    );
+    getBridge().getWebView().setBackgroundColor(Color.parseColor(darkMode ? "#0E1713" : "#F4F7F4"));
     applyLaunchBarStyle();
   }
 
@@ -275,9 +296,38 @@ public class MainActivity extends BridgeActivity {
   }
 
   @Override
+  public void onRequestPermissionsResult(
+    int requestCode,
+    String[] permissions,
+    int[] grantResults
+  ) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode != CALL_LOG_PERMISSION_REQUEST) return;
+    if (
+      grantResults.length > 0
+        && grantResults[0] == PackageManager.PERMISSION_GRANTED
+    ) {
+      dispatchDeviceCallHistory();
+    } else {
+      dispatchNativeResult(
+        "call-history",
+        false,
+        "",
+        "Phone call history permission was not granted."
+      );
+    }
+  }
+
+  @Override
   public void onResume() {
     super.onResume();
     if (launchOverlay == null) applySystemBars(darkMode);
+  }
+
+  @Override
+  public void onWindowFocusChanged(boolean hasFocus) {
+    super.onWindowFocusChanged(hasFocus);
+    if (hasFocus && launchOverlay == null) applySystemBars(darkMode);
   }
 
   private void captureSharedText(Intent intent) {
@@ -340,6 +390,33 @@ public class MainActivity extends BridgeActivity {
     }
 
     @JavascriptInterface
+    public String availableWhatsAppApps() {
+      JSONArray applications = new JSONArray();
+      if (isPackageAvailable("com.whatsapp")) {
+        applications.put("com.whatsapp");
+      }
+      if (isPackageAvailable("com.whatsapp.w4b")) {
+        applications.put("com.whatsapp.w4b");
+      }
+      return applications.toString();
+    }
+
+    @JavascriptInterface
+    public void openWhatsAppIn(String number, String message, String packageName) {
+      runOnUiThread(() -> {
+        String url = "https://wa.me/" + number
+          + (message.isEmpty() ? "" : "?text=" + Uri.encode(message));
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        intent.setPackage(packageName);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+          startActivity(intent);
+        } else {
+          startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        }
+      });
+    }
+
+    @JavascriptInterface
     public void copyText(String value) {
       ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
       clipboard.setPrimaryClip(ClipData.newPlainText("Who Called", value));
@@ -362,6 +439,33 @@ public class MainActivity extends BridgeActivity {
     @JavascriptInterface
     public boolean deviceCallHistorySupported() {
       return DEVICE_CALL_LOG_ENABLED;
+    }
+
+    @JavascriptInterface
+    public void requestDeviceCallHistory() {
+      runOnUiThread(() -> {
+        if (!DEVICE_CALL_LOG_ENABLED) {
+          dispatchNativeResult(
+            "call-history",
+            false,
+            "",
+            "Phone call history is disabled in this Android build."
+          );
+          return;
+        }
+        if (
+          Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+            && checkSelfPermission(Manifest.permission.READ_CALL_LOG)
+              != PackageManager.PERMISSION_GRANTED
+        ) {
+          requestPermissions(
+            new String[] { Manifest.permission.READ_CALL_LOG },
+            CALL_LOG_PERMISSION_REQUEST
+          );
+          return;
+        }
+        dispatchDeviceCallHistory();
+      });
     }
 
     @JavascriptInterface
@@ -566,10 +670,90 @@ public class MainActivity extends BridgeActivity {
     });
   }
 
+  private boolean isPackageAvailable(String packageName) {
+    try {
+      getPackageManager().getPackageInfo(packageName, 0);
+      return true;
+    } catch (PackageManager.NameNotFoundException ignored) {
+      return false;
+    }
+  }
+
+  private void dispatchDeviceCallHistory() {
+    JSONArray calls = new JSONArray();
+    String[] projection = new String[] {
+      CallLog.Calls.NUMBER,
+      CallLog.Calls.TYPE,
+      CallLog.Calls.DATE,
+      CallLog.Calls.DURATION,
+      CallLog.Calls.CACHED_NAME
+    };
+    try (
+      Cursor cursor = getContentResolver().query(
+        CallLog.Calls.CONTENT_URI,
+        projection,
+        null,
+        null,
+        CallLog.Calls.DATE + " DESC"
+      )
+    ) {
+      if (cursor == null) throw new IllegalStateException("Phone call history is unavailable.");
+      int numberIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER);
+      int typeIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE);
+      int dateIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.DATE);
+      int durationIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION);
+      int nameIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME);
+      int count = 0;
+      while (cursor.moveToNext() && count < 100) {
+        String number = cursor.getString(numberIndex);
+        String cachedName = cursor.getString(nameIndex);
+        JSONObject call = new JSONObject()
+          .put("id", cursor.getLong(dateIndex) + "-" + count)
+          .put("number", number == null ? "" : number)
+          .put("cachedName", cachedName == null ? "" : cachedName)
+          .put("type", callType(cursor.getInt(typeIndex)))
+          .put("timestamp", cursor.getLong(dateIndex))
+          .put("durationSeconds", cursor.getLong(durationIndex));
+        calls.put(call);
+        count += 1;
+      }
+      dispatchNativeResult("call-history", true, calls.toString(), "");
+    } catch (Exception error) {
+      dispatchNativeResult(
+        "call-history",
+        false,
+        "",
+        error.getMessage() == null ? "Phone call history could not be read." : error.getMessage()
+      );
+    }
+  }
+
+  private String callType(int value) {
+    switch (value) {
+      case CallLog.Calls.INCOMING_TYPE:
+        return "incoming";
+      case CallLog.Calls.OUTGOING_TYPE:
+        return "outgoing";
+      case CallLog.Calls.MISSED_TYPE:
+        return "missed";
+      case CallLog.Calls.REJECTED_TYPE:
+        return "rejected";
+      case CallLog.Calls.BLOCKED_TYPE:
+        return "blocked";
+      case CallLog.Calls.VOICEMAIL_TYPE:
+        return "voicemail";
+      default:
+        return "unknown";
+    }
+  }
+
   @SuppressWarnings("deprecation")
   private void applySystemBars(boolean dark) {
     Window window = getWindow();
     int background = Color.parseColor(dark ? "#0E1713" : "#F4F7F4");
+    window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(background));
+    window.getDecorView().setBackgroundColor(background);
+    getBridge().getWebView().setBackgroundColor(background);
     window.setStatusBarColor(background);
     window.setNavigationBarColor(background);
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

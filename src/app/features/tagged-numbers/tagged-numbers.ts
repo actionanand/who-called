@@ -1,6 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TaggedNumber } from '../../core/models/app.models';
 import { AppStore } from '../../core/services/app-store.service';
 import { FeedbackService } from '../../core/services/feedback.service';
@@ -35,6 +36,8 @@ export class TaggedNumbers {
   private readonly formBuilder = inject(FormBuilder);
   private readonly feedback = inject(FeedbackService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly editingNumber = signal<TaggedNumber | null>(null);
@@ -59,10 +62,18 @@ export class TaggedNumbers {
     important: false,
   });
 
-  protected openEditor(number?: TaggedNumber): void {
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parameters) => {
+      if (!parameters.has('add')) return;
+      this.openEditor(undefined, this.store.pendingTaggedNumber());
+      this.store.pendingTaggedNumber.set('');
+    });
+  }
+
+  protected openEditor(number?: TaggedNumber, draftPhone = ''): void {
     this.editingNumber.set(number ?? null);
     this.form.reset({
-      phone: number?.phone ?? '',
+      phone: number?.phone ?? draftPhone,
       tag: number?.tag ?? 'Repeated Call',
       note: number?.note ?? '',
       important: number?.important ?? false,

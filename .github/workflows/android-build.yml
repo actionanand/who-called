@@ -16,7 +16,7 @@ concurrency:
 env:
   MIN_SDK_VERSION: 24
   TARGET_SDK_VERSION: 35
-  ENABLE_DEVICE_CALL_LOG: false
+  ENABLE_DEVICE_CALL_LOG: true
   RELEASE_BASENAME: who-called
 
 jobs:

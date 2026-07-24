@@ -101,6 +101,10 @@
       </button>
     </div>
     <div class="sheet-grid">
+      <a href="tel:" (click)="closeQuickActions()">
+        <span class="action-icon blue"><app-icon name="phone" /></span>
+        <span><strong>Make a call</strong><small>Open the phone dialler</small></span>
+      </a>
       <a routerLink="/contacts" [queryParams]="{ add: 1 }" (click)="closeQuickActions()">
         <span class="action-icon mint"><app-icon name="user-plus" /></span>
         <span><strong>Add contact</strong><small>Keep it private</small></span>
