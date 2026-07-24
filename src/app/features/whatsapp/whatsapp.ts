@@ -1,8 +1,8 @@
-import { NgOptimizedImage } from '@angular/common';
 import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AppStore } from '../../core/services/app-store.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 import { SORTED_COUNTRY_CODES } from '../../core/data/country-codes';
 import {
   NativeIntegrationService,
@@ -10,17 +10,19 @@ import {
 } from '../../core/services/native-integration.service';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
+import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
 import { buildWhatsAppUrl, normalizePhone } from '../../core/utils/phone-number';
 
 @Component({
   selector: 'app-whatsapp',
-  imports: [AppIcon, NgOptimizedImage, ReactiveFormsModule, SelectPicker],
+  imports: [AppIcon, ReactiveFormsModule, SelectPicker, WhatsAppAppChooser],
   templateUrl: './whatsapp.html',
   styleUrl: './whatsapp.scss',
 })
 export class WhatsApp {
   private readonly formBuilder = inject(FormBuilder);
   private readonly native = inject(NativeIntegrationService);
+  private readonly feedback = inject(FeedbackService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly store = inject(AppStore);
   protected readonly attempted = signal(false);
@@ -142,15 +144,21 @@ export class WhatsApp {
     this.native.openWhatsAppIn(choice.number, choice.message, packageName);
   }
 
-  protected appName(packageName: WhatsAppPackage): string {
-    return packageName === 'com.whatsapp.w4b' ? 'WhatsApp Business' : 'WhatsApp';
-  }
-
-  protected appIcon(packageName: WhatsAppPackage): string {
-    return packageName === 'com.whatsapp.w4b' ? '/whatsapp-business.png' : '/whatsapp.png';
-  }
-
-  protected pasteNumber(): void {
-    void navigator.clipboard.readText().then((value) => this.form.controls.number.setValue(value));
+  protected async pasteNumber(): Promise<void> {
+    let value = this.native.readClipboard();
+    if (!value) {
+      try {
+        value = await navigator.clipboard.readText();
+      } catch {
+        this.feedback.notify('Clipboard access was blocked by the browser');
+        return;
+      }
+    }
+    if (!value.trim()) {
+      this.feedback.notify('Clipboard does not contain a phone number');
+      return;
+    }
+    this.form.controls.number.setValue(value.trim());
+    this.feedback.notify('Phone number pasted');
   }
 }

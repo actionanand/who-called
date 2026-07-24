@@ -1,12 +1,38 @@
 <div class="page contacts-page">
   <header class="page-heading heading-row">
     <div>
-      <h1>Private contacts</h1>
-      <p>Separate from your Android address book.</p>
+      @if (selectionMode()) {
+        <p class="selection-eyebrow">Selection</p>
+        <h1>{{ selectedIds().size }} selected</h1>
+      } @else {
+        <h1>Private contacts</h1>
+        <p>Separate from your Android address book.</p>
+      }
     </div>
-    <button class="primary-button add-button" type="button" (click)="openEditor()">
-      <app-icon name="user-plus" /> <span>Add</span>
-    </button>
+    @if (selectionMode()) {
+      <div class="selection-actions">
+        @if (selectedIds().size === 1) {
+          <button type="button" aria-label="Edit selected contact" (click)="editSelection()">
+            <app-icon name="edit" />
+          </button>
+        }
+        <button
+          class="danger"
+          type="button"
+          aria-label="Delete selected contacts"
+          (click)="deleteSelection()"
+        >
+          <app-icon name="trash" />
+        </button>
+        <button type="button" aria-label="Clear contact selection" (click)="clearSelection()">
+          <app-icon name="close" />
+        </button>
+      </div>
+    } @else {
+      <button class="primary-button add-button" type="button" (click)="openEditor()">
+        <app-icon name="user-plus" /> <span>Add</span>
+      </button>
+    }
   </header>
 
   <label class="search-box">
@@ -32,7 +58,15 @@
   } @else if (filteredContacts().length) {
     <section class="contact-stack" aria-label="Contacts">
       @for (contact of filteredContacts(); track contact.id) {
-        <article class="contact-card card">
+        <article
+          class="contact-card card"
+          [class.selection-mode]="selectionMode()"
+          [class.selected]="selectedIds().has(contact.id)"
+          (pointerdown)="startHold(contact, $event)"
+          (pointerup)="cancelHold()"
+          (pointercancel)="cancelHold()"
+          (pointerleave)="cancelHold()"
+        >
           <button
             class="avatar"
             type="button"
@@ -40,6 +74,21 @@
             (click)="openContactDetails(contact)"
           >
             {{ contact.name.slice(0, 1).toUpperCase() }}
+          </button>
+          <button
+            class="selection-toggle"
+            type="button"
+            [attr.aria-pressed]="selectedIds().has(contact.id)"
+            [attr.aria-label]="
+              selectedIds().has(contact.id)
+                ? 'Deselect ' + displayName(contact)
+                : 'Select ' + displayName(contact)
+            "
+            (click)="toggleSelection(contact.id)"
+          >
+            @if (selectedIds().has(contact.id)) {
+              <app-icon name="check" />
+            }
           </button>
           <div class="copy">
             <span class="name-line">
@@ -82,20 +131,6 @@
               (click)="openPhoneAction(contact, 'call')"
             >
               <app-icon name="phone" />
-            </button>
-            <button
-              type="button"
-              [attr.aria-label]="'Edit ' + displayName(contact)"
-              (click)="openEditor(contact)"
-            >
-              <app-icon name="edit" />
-            </button>
-            <button
-              type="button"
-              [attr.aria-label]="'Delete ' + displayName(contact)"
-              (click)="remove(contact.id, displayName(contact))"
-            >
-              <app-icon name="trash" />
             </button>
           </div>
         </article>
@@ -410,6 +445,14 @@
       }
     </div>
   </section>
+}
+
+@if (whatsappChoice(); as choice) {
+  <app-whatsapp-app-chooser
+    [packages]="choice.packages"
+    (chosen)="openWhatsAppIn($event)"
+    (closed)="closeWhatsAppChoice()"
+  />
 }
 
 @if (selectedContact(); as contact) {

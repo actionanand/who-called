@@ -92,38 +92,9 @@
 </div>
 
 @if (appChoice(); as choice) {
-  <button
-    class="modal-scrim"
-    type="button"
-    aria-label="Close WhatsApp application chooser"
-    (click)="closeAppChoice()"
-  ></button>
-  <section class="app-chooser" role="dialog" aria-modal="true" aria-labelledby="whatsapp-app-title">
-    <header>
-      <div>
-        <p class="eyebrow">Open chat with</p>
-        <h2 id="whatsapp-app-title">Choose WhatsApp</h2>
-      </div>
-      <button class="close-button" type="button" aria-label="Close" (click)="closeAppChoice()">
-        <app-icon name="close" />
-      </button>
-    </header>
-    <div class="app-options">
-      @for (packageName of choice.packages; track packageName) {
-        <button type="button" (click)="openIn(packageName)">
-          <img
-            [ngSrc]="appIcon(packageName)"
-            width="48"
-            height="48"
-            [alt]="appName(packageName) + ' icon'"
-          />
-          <span>
-            <strong>{{ appName(packageName) }}</strong>
-            <small>Open this number here</small>
-          </span>
-          <app-icon name="chevron" />
-        </button>
-      }
-    </div>
-  </section>
+  <app-whatsapp-app-chooser
+    [packages]="choice.packages"
+    (chosen)="openIn($event)"
+    (closed)="closeAppChoice()"
+  />
 }

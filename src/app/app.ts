@@ -5,6 +5,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { AppIcon } from './shared/components/app-icon';
 import { AppFeedback } from './shared/components/app-feedback';
 import { AppStore } from './core/services/app-store.service';
+import { CallService } from './core/services/call.service';
 import { NativeIntegrationService } from './core/services/native-integration.service';
 import { SecurityService } from './core/services/security.service';
 
@@ -28,6 +29,7 @@ import { SecurityService } from './core/services/security.service';
 export class App {
   protected readonly store = inject(AppStore);
   private readonly native = inject(NativeIntegrationService);
+  private readonly calls = inject(CallService);
   private readonly router = inject(Router);
   private readonly security = inject(SecurityService);
   protected readonly unlockPin = signal('');
@@ -43,6 +45,11 @@ export class App {
 
   protected closeQuickActions(): void {
     this.store.quickActionsOpen.set(false);
+  }
+
+  protected makeCall(): void {
+    this.closeQuickActions();
+    void this.calls.confirmAndCall();
   }
 
   protected async unlock(): Promise<void> {

@@ -10,11 +10,17 @@ import {
   PrivateContact,
 } from '../../core/models/app.models';
 import { AppStore } from '../../core/services/app-store.service';
+import { CallService } from '../../core/services/call.service';
 import { FeedbackService } from '../../core/services/feedback.service';
+import {
+  NativeIntegrationService,
+  WhatsAppPackage,
+} from '../../core/services/native-integration.service';
 import { digitsOnly, formatIndianPhone, normalizePhone } from '../../core/utils/phone-number';
 import { contactDisplayName } from '../../core/utils/contact-privacy';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
+import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
 
 const PHONE_TYPES: readonly SelectPickerOption[] = [
   { value: 'Mobile', label: 'Mobile' },
@@ -56,7 +62,7 @@ interface PhoneChoiceSheet {
 
 @Component({
   selector: 'app-contacts',
-  imports: [AppIcon, ReactiveFormsModule, SelectPicker],
+  imports: [AppIcon, ReactiveFormsModule, SelectPicker, WhatsAppAppChooser],
   templateUrl: './contacts.html',
   styleUrl: './contacts.scss',
 })
@@ -66,6 +72,8 @@ export class Contacts {
   private readonly destroyRef = inject(DestroyRef);
   private readonly feedback = inject(FeedbackService);
   private readonly document = inject(DOCUMENT);
+  private readonly native = inject(NativeIntegrationService);
+  private readonly calls = inject(CallService);
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly editingContact = signal<PrivateContact | null>(null);
@@ -73,7 +81,17 @@ export class Contacts {
   protected readonly saving = signal(false);
   protected readonly revealedNames = signal<ReadonlySet<string>>(new Set());
   protected readonly phoneChoice = signal<PhoneChoiceSheet | null>(null);
+  protected readonly whatsappChoice = signal<{
+    readonly phone: ContactPhone;
+    readonly packages: readonly WhatsAppPackage[];
+  } | null>(null);
   protected readonly selectedContact = signal<PrivateContact | null>(null);
+  protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
+  protected readonly selectedContacts = computed(() => {
+    const ids = this.selectedIds();
+    return this.store.contacts().filter((contact) => ids.has(contact.id));
+  });
   protected readonly formatPhone = formatIndianPhone;
   protected readonly phoneTypes = PHONE_TYPES;
   protected readonly emailTypes = EMAIL_TYPES;
@@ -116,6 +134,7 @@ export class Contacts {
   constructor() {
     this.destroyRef.onDestroy(() => {
       for (const timeout of this.revealTimeouts.values()) clearTimeout(timeout);
+      this.cancelHold();
     });
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parameters) => {
       if (parameters.has('add')) this.openEditor();
@@ -123,6 +142,7 @@ export class Contacts {
   }
 
   private readonly revealTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected get phones() {
     return this.form.controls.phones;
@@ -318,15 +338,57 @@ export class Contacts {
     }
   }
 
-  protected async remove(id: string, name: string): Promise<void> {
+  protected toggleSelection(id: string): void {
+    this.selectedIds.update((selected) => {
+      const next = new Set(selected);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  protected startHold(contact: PrivateContact, event: PointerEvent): void {
+    if (event.pointerType !== 'touch' || this.isInteractiveTarget(event.target)) return;
+    this.cancelHold();
+    this.holdTimer = setTimeout(() => {
+      this.toggleSelection(contact.id);
+      navigator.vibrate?.(25);
+    }, 550);
+  }
+
+  protected cancelHold(): void {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = null;
+  }
+
+  protected editSelection(): void {
+    const contact = this.selectedContacts()[0];
+    if (this.selectedIds().size !== 1 || !contact) return;
+    this.clearSelection();
+    this.openEditor(contact);
+  }
+
+  protected async deleteSelection(): Promise<void> {
+    const contacts = this.selectedContacts();
+    if (!contacts.length) return;
     const confirmed = await this.feedback.confirm({
-      title: 'Delete private contact?',
-      message: `${name} will be removed from Who Called?. Linked messages and device call history will not be deleted.`,
-      confirmLabel: 'Delete contact',
+      title: contacts.length === 1 ? 'Delete selected contact?' : 'Delete selected contacts?',
+      message:
+        contacts.length === 1
+          ? `${contacts[0].name} will be removed from Who Called?. Device call history will not be deleted.`
+          : `${contacts.length} contacts will be removed from Who Called?. Device call history will not be deleted.`,
+      confirmLabel: contacts.length === 1 ? 'Delete contact' : `Delete ${contacts.length} contacts`,
     });
     if (!confirmed) return;
-    await this.store.removeContact(id);
-    this.feedback.notify(`${name} deleted`);
+    for (const contact of contacts) await this.store.removeContact(contact.id);
+    this.clearSelection();
+    this.feedback.notify(
+      contacts.length === 1 ? `${contacts[0].name} deleted` : `${contacts.length} contacts deleted`,
+    );
   }
 
   protected displayName(contact: PrivateContact): string {
@@ -461,14 +523,34 @@ export class Contacts {
   private openPhone(phone: ContactPhone, mode: PhoneAction): void {
     const normalized = phone.normalizedNumber;
     if (mode === 'whatsapp') {
-      this.document.defaultView?.open(
-        `https://wa.me/${normalized.slice(1)}`,
-        '_blank',
-        'noopener,noreferrer',
-      );
+      this.openWhatsApp(phone);
       return;
     }
-    this.document.defaultView?.location.assign(`tel:${normalized}`);
+    void this.calls.confirmAndCall(normalized, this.phoneLabel(phone));
+  }
+
+  protected closeWhatsAppChoice(): void {
+    this.whatsappChoice.set(null);
+  }
+
+  protected openWhatsAppIn(packageName: WhatsAppPackage): void {
+    const choice = this.whatsappChoice();
+    if (!choice) return;
+    this.closeWhatsAppChoice();
+    this.native.openWhatsAppIn(choice.phone.normalizedNumber.slice(1), '', packageName);
+  }
+
+  private openWhatsApp(phone: ContactPhone): void {
+    const number = phone.normalizedNumber.slice(1);
+    const packages = this.native.availableWhatsAppApps();
+    if (packages.length > 1) {
+      this.whatsappChoice.set({ phone, packages });
+      return;
+    }
+    if (packages.length === 1 && this.native.openWhatsAppIn(number, '', packages[0])) return;
+    if (this.native.openWhatsApp(number, '', this.store.settings().whatsappBusinessFallback))
+      return;
+    this.document.defaultView?.open(`https://wa.me/${number}`, '_blank', 'noopener,noreferrer');
   }
 
   private createEmail(email?: ContactEmail) {
@@ -495,5 +577,9 @@ export class Contacts {
       invalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       invalid?.focus();
     });
+  }
+
+  private isInteractiveTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(target.closest('button, a, input, textarea'));
   }
 }

@@ -14,48 +14,6 @@
   </a>
 
   <div class="section-title">
-    <h2>Recent contacts</h2>
-    <a class="text-link" routerLink="/contacts">See all</a>
-  </div>
-  <section class="card contact-list" aria-label="Recent contacts">
-    @if (store.loading()) {
-      <div class="loading-row">
-        <span></span>
-        <div><i></i><i></i></div>
-      </div>
-      <div class="loading-row">
-        <span></span>
-        <div><i></i><i></i></div>
-      </div>
-    } @else if (store.recentContacts().length) {
-      @for (contact of store.recentContacts(); track contact.id) {
-        <article class="contact-row">
-          <span class="avatar">{{ contact.name.slice(0, 1).toUpperCase() }}</span>
-          <span class="contact-copy">
-            <strong>{{ displayName(contact) }}</strong>
-            <small>{{ contact.company || '+91 ' + formatPhone(contact.phone) }}</small>
-          </span>
-          <a
-            [href]="'tel:' + contact.normalizedPhone"
-            [attr.aria-label]="'Call ' + displayName(contact)"
-          >
-            <app-icon name="phone" />
-          </a>
-        </article>
-      }
-    } @else {
-      <div class="empty-state compact">
-        <span class="empty-icon"><app-icon name="contacts" /></span>
-        <h3>No private contacts yet</h3>
-        <p>Add someone here without saving them to Android Contacts.</p>
-        <a class="primary-button" routerLink="/contacts" [queryParams]="{ add: 1 }">
-          <app-icon name="user-plus" /> Add your first contact
-        </a>
-      </div>
-    }
-  </section>
-
-  <div class="section-title">
     <h2>Phone call history</h2>
     <a class="text-link" routerLink="/tagged">Tagged numbers</a>
   </div>
@@ -106,9 +64,16 @@
     } @else if (enrichedCallHistory().length) {
       @for (call of enrichedCallHistory(); track call.id) {
         <article class="history-row">
-          <span class="call-kind" [class.missed]="call.type === 'missed'">
-            <app-icon name="phone" />
-          </span>
+          <button
+            class="call-kind"
+            [class.missed]="call.type === 'missed'"
+            type="button"
+            [disabled]="!hasDialableNumber(call.number)"
+            [attr.aria-label]="'Call ' + call.displayName"
+            (click)="callFromHistory(call)"
+          >
+            <app-icon [name]="callIcon(call)" />
+          </button>
           <span class="history-copy">
             <strong>{{ call.displayName }}</strong>
             <small>
@@ -140,11 +105,6 @@
               >
                 <app-icon name="tag" />
               </button>
-            }
-            @if (hasDialableNumber(call.number)) {
-              <a [href]="'tel:' + call.number" [attr.aria-label]="'Call ' + call.displayName">
-                <app-icon name="phone" />
-              </a>
             }
           </span>
         </article>

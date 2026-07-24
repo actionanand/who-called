@@ -56,61 +56,6 @@
   text-decoration: none;
 }
 
-.contact-list {
-  overflow: hidden;
-}
-
-.contact-row {
-  display: flex;
-  min-height: 4.65rem;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.7rem 0.8rem;
-}
-
-.contact-row + .contact-row {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.avatar {
-  display: grid;
-  width: 2.9rem;
-  height: 2.9rem;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--primary);
-  background: var(--primary-soft);
-  font-weight: 800;
-}
-
-.contact-copy {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 0.18rem;
-}
-
-.contact-copy small {
-  overflow: hidden;
-  color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.contact-row a {
-  display: grid;
-  width: 2.65rem;
-  height: 2.65rem;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--primary);
-  background: var(--primary-soft);
-}
-
-.empty-state.compact {
-  padding-block: 1.5rem;
-}
-
 .activity-card {
   display: flex;
   align-items: flex-start;
@@ -163,9 +108,16 @@
   width: 2.65rem;
   height: 2.65rem;
   place-items: center;
+  padding: 0;
+  border: 0;
   border-radius: 0.85rem;
   color: var(--primary);
   background: var(--primary-soft);
+}
+
+.call-kind:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .call-kind.missed {
@@ -215,7 +167,6 @@
   gap: 0.25rem;
 }
 
-.history-actions a,
 .history-actions button {
   display: grid;
   width: 2.35rem;
