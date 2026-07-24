@@ -59,9 +59,14 @@ The plain command increments only `versionCode`. The other commands also update 
 
 The workflow runs manually, on `main-android`, and on `v*` tags.
 
-- Branch builds create `releases/who-called-debug.apk`.
-- Version tags build and sign `who-called-<version>.apk` and `who-called-<version>.aab`.
-- Artifacts and `playstore-icon.png` are uploaded for 30 days.
+- Every run builds a release APK and AAB.
+- When all signing secrets are available, CI creates signed `who-called-<version>.apk` and
+  `who-called-<version>.aab` files.
+- When signing secrets are missing or signing fails, CI publishes clearly named
+  `who-called-<version>-unsigned.apk` and `who-called-<version>-unsigned.aab` files instead.
+- Artifacts and `playstore-icon.png` are uploaded for 30 days, and a missing APK or AAB fails the
+  workflow instead of producing an empty successful run.
+- Builds on `main-android` also commit the generated files to the branch under `releases/`.
 - Tag builds also create a GitHub Release.
 
 The CI environment uses minimum SDK 24, target SDK 35, Java 21 and Node 24.16.

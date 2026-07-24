@@ -102,55 +102,143 @@ jobs:
       - name: Patch native Android shell
         run: node scripts/patch-android.mjs
 
-      - name: Build debug APK
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        working-directory: android
-        run: ./gradlew assembleDebug -PversionCode="$VERSION_CODE" -PversionName="$VERSION_NAME"
+      - name: Clear previous Android release artifacts
+        run: |
+          mkdir -p releases
+          rm -f releases/*.apk releases/*.aab releases/*.apk.idsig
 
-      - name: Build release APK and AAB
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Build unsigned release APK and AAB
         working-directory: android
         run: ./gradlew assembleRelease bundleRelease -PversionCode="$VERSION_CODE" -PversionName="$VERSION_NAME"
 
       - name: Decode release keystore
-        if: startsWith(github.ref, 'refs/tags/v')
+        id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          test -n "$KEYSTORE_BASE64"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+          if [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD" && -n "$KEY_ALIAS" ]]; then
+            if printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks; then
+              echo "available=true" >> "$GITHUB_OUTPUT"
+              echo "Release keystore decoded. Signed artifacts will be attempted."
+            else
+              rm -f android/app/release-keystore.jks
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "KEYSTORE_BASE64 could not be decoded. Unsigned artifacts will be published."
+            fi
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets are incomplete. Unsigned artifacts will be published."
+          fi
 
-      - name: Sign and verify release artifacts
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Detect keystore type
+        id: keystore_type
+        if: steps.keystore.outputs.available == 'true'
+        continue-on-error: true
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          KS_TYPE=$(keytool -list -keystore android/app/release-keystore.jks -storepass:env KEYSTORE_PASSWORD 2>/dev/null | grep -i "Keystore type" | awk '{print $NF}')
+          echo "type=$KS_TYPE" >> "$GITHUB_OUTPUT"
+          echo "Detected keystore type: $KS_TYPE"
+
+      - name: Sign APK
+        id: sign_apk
+        if: steps.keystore.outputs.available == 'true'
+        continue-on-error: true
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_PASSWORD: ${{ steps.keystore_type.outputs.type == 'PKCS12' && secrets.KEYSTORE_PASSWORD || secrets.KEY_PASSWORD }}
         run: |
-          mkdir -p releases
           BUILD_TOOLS="${ANDROID_HOME}/build-tools/$(ls "${ANDROID_HOME}/build-tools" | sort -V | tail -1)"
           UNSIGNED_APK=$(find android/app/build -name '*-release-unsigned.apk' | head -1)
-          "$BUILD_TOOLS/zipalign" -v 4 "$UNSIGNED_APK" "releases/${RELEASE_FILE}.apk"
-          "$BUILD_TOOLS/apksigner" sign --ks android/app/release-keystore.jks --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD "releases/${RELEASE_FILE}.apk"
-          "$BUILD_TOOLS/apksigner" verify --verbose "releases/${RELEASE_FILE}.apk"
-          UNSIGNED_AAB=$(find android/app/build -name '*-release.aab' | head -1)
-          jarsigner -keystore android/app/release-keystore.jks -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -signedjar "releases/${RELEASE_FILE}.aab" "$UNSIGNED_AAB" "$KEY_ALIAS"
-          jarsigner -verify "releases/${RELEASE_FILE}.aab"
+          OUTPUT_APK="releases/${RELEASE_FILE}.apk"
+          test -s "$UNSIGNED_APK"
+          rm -f "$OUTPUT_APK"
+          "$BUILD_TOOLS/zipalign" -v 4 "$UNSIGNED_APK" "$OUTPUT_APK"
+          "$BUILD_TOOLS/apksigner" sign --ks android/app/release-keystore.jks --ks-pass env:KEYSTORE_PASSWORD --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD "$OUTPUT_APK"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$OUTPUT_APK"
+          echo "Signed APK created: $OUTPUT_APK"
 
-      - name: Collect debug artifact
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+      - name: Copy unsigned APK
+        if: steps.keystore.outputs.available != 'true' || steps.sign_apk.outcome == 'failure'
         run: |
-          mkdir -p releases
-          cp android/app/build/outputs/apk/debug/app-debug.apk releases/who-called-debug.apk
+          UNSIGNED_APK=$(find android/app/build -name '*-release-unsigned.apk' | head -1)
+          OUTPUT_APK="releases/${RELEASE_FILE}-unsigned.apk"
+          test -s "$UNSIGNED_APK"
+          rm -f "releases/${RELEASE_FILE}.apk" "$OUTPUT_APK"
+          cp "$UNSIGNED_APK" "$OUTPUT_APK"
+          echo "Unsigned APK created: $OUTPUT_APK"
+
+      - name: Sign AAB
+        id: sign_aab
+        if: steps.keystore.outputs.available == 'true'
+        continue-on-error: true
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ steps.keystore_type.outputs.type == 'PKCS12' && secrets.KEYSTORE_PASSWORD || secrets.KEY_PASSWORD }}
+        run: |
+          UNSIGNED_AAB=$(find android/app/build -name '*-release.aab' | head -1)
+          OUTPUT_AAB="releases/${RELEASE_FILE}.aab"
+          test -s "$UNSIGNED_AAB"
+          rm -f "$OUTPUT_AAB"
+          STORE_PASS_FILE=$(mktemp)
+          KEY_PASS_FILE=$(mktemp)
+          trap 'rm -f "$STORE_PASS_FILE" "$KEY_PASS_FILE"' EXIT
+          printf '%s' "$KEYSTORE_PASSWORD" > "$STORE_PASS_FILE"
+          printf '%s' "$KEY_PASSWORD" > "$KEY_PASS_FILE"
+          jarsigner -verbose -keystore android/app/release-keystore.jks -storepass:file "$STORE_PASS_FILE" -keypass:file "$KEY_PASS_FILE" -signedjar "$OUTPUT_AAB" "$UNSIGNED_AAB" "$KEY_ALIAS"
+          jarsigner -verify -verbose -certs "$OUTPUT_AAB"
+          echo "Signed AAB created: $OUTPUT_AAB"
+
+      - name: Copy unsigned AAB
+        if: steps.keystore.outputs.available != 'true' || steps.sign_aab.outcome == 'failure'
+        run: |
+          UNSIGNED_AAB=$(find android/app/build -name '*-release.aab' | head -1)
+          OUTPUT_AAB="releases/${RELEASE_FILE}-unsigned.aab"
+          test -s "$UNSIGNED_AAB"
+          rm -f "releases/${RELEASE_FILE}.aab" "$OUTPUT_AAB"
+          cp "$UNSIGNED_AAB" "$OUTPUT_AAB"
+          echo "Unsigned AAB created: $OUTPUT_AAB"
+
+      - name: Summarize Android artifacts
+        run: |
+          echo "## Android artifact summary" >> "$GITHUB_STEP_SUMMARY"
+          find releases -maxdepth 1 \( -name '*.apk' -o -name '*.aab' -o -name 'playstore-icon.png' \) -type f -print -exec ls -lh {} \;
+          APK_FILE=$(find releases -maxdepth 1 -name '*.apk' -type f | head -1)
+          AAB_FILE=$(find releases -maxdepth 1 -name '*.aab' -type f | head -1)
+          test -s "$APK_FILE"
+          test -s "$AAB_FILE"
+          echo "- APK: \`$APK_FILE\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- AAB: \`$AAB_FILE\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit release files to main-android
+        if: github.ref == 'refs/heads/main-android'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash
+          git add releases/
+          if git diff --cached --quiet; then
+            echo "Release files are unchanged; no release commit is needed."
+          else
+            git commit -m "build: update Android release files [skip ci]"
+            git push
+            echo "APK, AAB, and Play Store icon committed to main-android/releases."
+          fi
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: who-called-android-${{ github.run_number }}
+          name: who-called-android-${{ env.VERSION_NAME }}
           path: |
             releases/*.apk
             releases/*.aab
             releases/playstore-icon.png
+          if-no-files-found: error
           retention-days: 30
 
       - name: Create GitHub release
