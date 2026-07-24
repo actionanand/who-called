@@ -44,6 +44,7 @@ export interface PrivateContact {
   readonly birthDate?: ContactBirthDate;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly deletedAt?: string;
 }
 
 export interface SavedMessage {

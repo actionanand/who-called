@@ -10,6 +10,8 @@ import { LOCAL_RECORD_REPOSITORY } from '../repositories/repository.contracts';
 import { ThemeService } from './theme.service';
 import { NativeIntegrationService } from './native-integration.service';
 
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 const DEFAULT_SETTINGS: AppSettings & { readonly id: string } = {
   id: 'primary',
   theme: 'automatic',
@@ -46,10 +48,16 @@ export class AppStore {
   readonly pendingTaggedNumber = signal('');
   readonly quickActionsOpen = signal(false);
   readonly locked = signal(false);
+  readonly activeContacts = computed(() => this.contacts().filter((contact) => !contact.deletedAt));
+  readonly trashedContacts = computed(() =>
+    this.contacts()
+      .filter((contact) => contact.deletedAt)
+      .sort((first, second) => (second.deletedAt ?? '').localeCompare(first.deletedAt ?? '')),
+  );
   readonly visibleContacts = computed(() =>
     this.settings().hideHiddenContacts
-      ? this.contacts().filter((contact) => !contact.hidden)
-      : this.contacts(),
+      ? this.activeContacts().filter((contact) => !contact.hidden)
+      : this.activeContacts(),
   );
   readonly favoriteContacts = computed(() =>
     this.visibleContacts().filter((contact) => contact.favorite),
@@ -79,6 +87,31 @@ export class AppStore {
   async removeContact(id: string): Promise<void> {
     await this.database.remove('contact', id);
     this.contacts.update((contacts) => contacts.filter((contact) => contact.id !== id));
+  }
+
+  async trashContact(id: string): Promise<void> {
+    const contact = this.contacts().find((entry) => entry.id === id);
+    if (!contact || contact.deletedAt) return;
+    const now = new Date().toISOString();
+    const trashed = { ...contact, deletedAt: now, updatedAt: now };
+    await this.database.put('contact', trashed);
+    this.contacts.update((contacts) =>
+      contacts.map((entry) => (entry.id === id ? trashed : entry)),
+    );
+  }
+
+  async restoreContact(id: string): Promise<void> {
+    const contact = this.contacts().find((entry) => entry.id === id);
+    if (!contact?.deletedAt) return;
+    const restored = {
+      ...contact,
+      deletedAt: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.database.put('contact', restored);
+    this.contacts.update((contacts) =>
+      contacts.map((entry) => (entry.id === id ? restored : entry)),
+    );
   }
 
   async addMessage(message: SavedMessage): Promise<void> {
@@ -142,15 +175,33 @@ export class AppStore {
   }
 
   async unlockSensitiveData(): Promise<void> {
-    const [contacts, messages, taggedNumbers] = await Promise.all([
+    const [storedContacts, messages, taggedNumbers] = await Promise.all([
       this.database.list<PrivateContact>('contact'),
       this.database.list<SavedMessage>('message'),
       this.database.list<TaggedNumber>('tagged-number'),
     ]);
+    const contacts = await this.purgeExpiredContacts(storedContacts);
     this.contacts.set(contacts);
     this.messages.set(messages);
     this.taggedNumbers.set(taggedNumbers);
     this.locked.set(false);
+  }
+
+  private async purgeExpiredContacts(
+    contacts: readonly PrivateContact[],
+  ): Promise<readonly PrivateContact[]> {
+    const cutoff = Date.now() - TRASH_RETENTION_MS;
+    const expiredIds = new Set(
+      contacts
+        .filter((contact) => {
+          if (!contact.deletedAt) return false;
+          const deletedAt = Date.parse(contact.deletedAt);
+          return Number.isFinite(deletedAt) && deletedAt <= cutoff;
+        })
+        .map((contact) => contact.id),
+    );
+    await Promise.all([...expiredIds].map((id) => this.database.remove('contact', id)));
+    return contacts.filter((contact) => !expiredIds.has(contact.id));
   }
 
   lockAndClear(): void {
