@@ -21,6 +21,28 @@
           {{ store.settings().pinEnabled ? 'On' : 'Off' }}
         </span>
       </button>
+      @if (isAndroid()) {
+        <button type="button" (click)="openPanel('biometric')">
+          <span class="setting-icon green"><app-icon name="biometric" /></span>
+          <span>
+            <strong>Biometric login</strong>
+            <small>
+              {{
+                store.settings().biometricEnabled
+                  ? biometricAvailable()
+                    ? 'Unlock with your fingerprint or device biometrics'
+                    : 'Biometric setup needs attention'
+                  : biometricAvailable()
+                    ? 'Use your fingerprint or device biometrics'
+                    : 'Set up strong biometrics in Android first'
+              }}
+            </small>
+          </span>
+          <span [class]="store.settings().biometricEnabled ? 'status-on' : 'status-off'">
+            {{ store.settings().biometricEnabled ? 'On' : 'Off' }}
+          </span>
+        </button>
+      }
       <button type="button" (click)="openPanel('privacy')">
         <span class="setting-icon blue"><app-icon name="shield" /></span>
         <span>
@@ -189,6 +211,9 @@
           @case ('lock') {
             Application lock
           }
+          @case ('biometric') {
+            Biometric login
+          }
           @case ('privacy') {
             Privacy protection
           }
@@ -222,37 +247,6 @@
           <button class="primary-button full-button" type="button" (click)="manualLock()">
             Lock now
           </button>
-          @if (biometricAvailable()) {
-            @if (!store.settings().biometricEnabled) {
-              <div class="field">
-                <label for="biometric-pin">Current PIN</label>
-                <input
-                  id="biometric-pin"
-                  type="password"
-                  inputmode="numeric"
-                  maxlength="8"
-                  [ngModel]="pin()"
-                  (ngModelChange)="pin.set($event)"
-                />
-              </div>
-            }
-            <button
-              class="secondary-button full-button"
-              type="button"
-              [disabled]="busy()"
-              (click)="toggleBiometric()"
-            >
-              <app-icon name="biometric" />
-              {{ store.settings().biometricEnabled ? 'Disable biometrics' : 'Enable biometrics' }}
-            </button>
-          } @else if (isAndroid()) {
-            <p class="panel-intro">
-              Strong biometrics are not available or enrolled on this device.
-            </p>
-          }
-          @if (error()) {
-            <p class="panel-error">{{ error() }}</p>
-          }
           <button class="secondary-button full-button" type="button" (click)="removePin()">
             Remove PIN
           </button>
@@ -293,6 +287,78 @@
           >
             <app-icon name="lock" /> {{ busy() ? 'Securing…' : 'Enable PIN' }}
           </button>
+        }
+      }
+      @case ('biometric') {
+        <div class="panel-copy">
+          <span class="large-icon"><app-icon name="biometric" /></span>
+          <h3>Fingerprint and biometric login</h3>
+          <p>
+            Android protects your application PIN with a key stored in Android Keystore. Your
+            enrolled strong biometric is required every time you use biometric login.
+          </p>
+        </div>
+
+        @if (!store.settings().pinEnabled) {
+          <p class="panel-intro">
+            Set an application PIN first. The PIN remains available as a fallback if Android cannot
+            verify your biometric.
+          </p>
+          <button class="primary-button full-button" type="button" (click)="openApplicationLock()">
+            <app-icon name="lock" /> Set application PIN
+          </button>
+        } @else if (store.settings().biometricEnabled) {
+          <p class="panel-intro">
+            Biometric login is enabled. Your application PIN remains available as a fallback.
+          </p>
+          @if (!biometricAvailable()) {
+            <p class="panel-error">
+              Android can no longer use the enrolled biometric. Disable biometric login and set it
+              up again after checking Android Settings.
+            </p>
+          }
+          <button
+            class="secondary-button full-button"
+            type="button"
+            [disabled]="busy()"
+            (click)="toggleBiometric()"
+          >
+            <app-icon name="biometric" />
+            {{ busy() ? 'Updating…' : 'Disable biometric login' }}
+          </button>
+        } @else if (!biometricAvailable()) {
+          <p class="panel-error">
+            Strong biometrics are not available. Add a fingerprint or another strong biometric in
+            Android Settings, then reopen Who Called?.
+          </p>
+        } @else {
+          <div class="field">
+            <label for="biometric-pin">Current application PIN</label>
+            <input
+              id="biometric-pin"
+              type="password"
+              inputmode="numeric"
+              autocomplete="current-password"
+              minlength="4"
+              maxlength="8"
+              [ngModel]="pin()"
+              (ngModelChange)="pin.set($event)"
+            />
+            <small>Android will request your fingerprint after the PIN is verified.</small>
+          </div>
+          <button
+            class="primary-button full-button"
+            type="button"
+            [disabled]="busy() || pin().length < 4"
+            (click)="toggleBiometric()"
+          >
+            <app-icon name="biometric" />
+            {{ busy() ? 'Waiting for Android…' : 'Enable biometric login' }}
+          </button>
+        }
+
+        @if (error()) {
+          <p class="panel-error">{{ error() }}</p>
         }
       }
       @case ('privacy') {
