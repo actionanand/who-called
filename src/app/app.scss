@@ -188,7 +188,8 @@
   margin-top: 1.25rem;
 }
 
-.sheet-grid a {
+.sheet-grid a,
+.sheet-grid > button {
   display: flex;
   min-height: 4.4rem;
   align-items: center;
@@ -201,7 +202,8 @@
   text-decoration: none;
 }
 
-.sheet-grid a > span:last-child {
+.sheet-grid a > span:last-child,
+.sheet-grid > button > span:last-child {
   display: grid;
   gap: 0.18rem;
 }

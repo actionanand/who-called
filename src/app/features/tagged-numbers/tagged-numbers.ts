@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TaggedNumber } from '../../core/models/app.models';
+import { CallService } from '../../core/services/call.service';
 import { AppStore } from '../../core/services/app-store.service';
 import { FeedbackService } from '../../core/services/feedback.service';
 import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
@@ -36,6 +37,7 @@ export class TaggedNumbers {
   private readonly formBuilder = inject(FormBuilder);
   private readonly feedback = inject(FeedbackService);
   private readonly router = inject(Router);
+  private readonly calls = inject(CallService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly store = inject(AppStore);
@@ -126,5 +128,9 @@ export class TaggedNumbers {
     if (!confirmed) return;
     await this.store.removeTaggedNumber(id);
     this.feedback.notify('Tagged number deleted');
+  }
+
+  protected call(number: TaggedNumber): void {
+    void this.calls.confirmAndCall(number.normalizedPhone, number.normalizedPhone);
   }
 }

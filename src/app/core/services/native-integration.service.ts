@@ -6,6 +6,8 @@ export type WhatsAppPackage = 'com.whatsapp' | 'com.whatsapp.w4b';
 
 interface WhoCalledNativeBridge {
   consumeSharedText(): string;
+  readClipboard(): string;
+  openDialler(number: string): void;
   openWhatsApp(number: string, message: string, businessFallback: boolean): void;
   availableWhatsAppApps(): string;
   openWhatsAppIn(number: string, message: string, packageName: string): void;
@@ -29,6 +31,17 @@ export class NativeIntegrationService {
 
   consumeSharedText(): string {
     return this.bridge()?.consumeSharedText().trim() ?? '';
+  }
+
+  readClipboard(): string {
+    return this.bridge()?.readClipboard().trim() ?? '';
+  }
+
+  openDialler(number = ''): boolean {
+    const bridge = this.bridge();
+    if (!bridge) return false;
+    bridge.openDialler(number);
+    return true;
   }
 
   openWhatsApp(number: string, message: string, businessFallback = true): boolean {

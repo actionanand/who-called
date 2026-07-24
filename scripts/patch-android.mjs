@@ -359,6 +359,16 @@ public class MainActivity extends BridgeActivity {
     }
 
     @JavascriptInterface
+    public String readClipboard() {
+      ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+      if (clipboard == null || !clipboard.hasPrimaryClip()) return "";
+      ClipData clip = clipboard.getPrimaryClip();
+      if (clip == null || clip.getItemCount() == 0) return "";
+      CharSequence text = clip.getItemAt(0).coerceToText(MainActivity.this);
+      return text == null ? "" : text.toString();
+    }
+
+    @JavascriptInterface
     public void openDialler(String number) {
       startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))));
     }

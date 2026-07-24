@@ -1,7 +1,7 @@
 <div class="app-frame">
   <header class="topbar">
     <a class="brand" routerLink="/home" aria-label="Who Called home">
-      <img ngSrc="/who-called.png" width="40" height="40" priority alt="" />
+      <img ngSrc="who-called.png" width="40" height="40" priority alt="" />
       <span>
         <strong>Who Called?</strong>
         <small>Private. Offline. Yours.</small>
@@ -45,7 +45,7 @@
 
 @if (store.locked()) {
   <section class="lock-screen" role="dialog" aria-modal="true" aria-labelledby="unlock-title">
-    <img ngSrc="/who-called.png" width="72" height="72" priority alt="" />
+    <img ngSrc="who-called.png" width="72" height="72" priority alt="" />
     <div>
       <p class="eyebrow">Private contact space</p>
       <h1 id="unlock-title">Who Called? is locked</h1>
@@ -101,10 +101,10 @@
       </button>
     </div>
     <div class="sheet-grid">
-      <a href="tel:" (click)="closeQuickActions()">
+      <button type="button" (click)="makeCall()">
         <span class="action-icon blue"><app-icon name="phone" /></span>
         <span><strong>Make a call</strong><small>Open the phone dialler</small></span>
-      </a>
+      </button>
       <a routerLink="/contacts" [queryParams]="{ add: 1 }" (click)="closeQuickActions()">
         <span class="action-icon mint"><app-icon name="user-plus" /></span>
         <span><strong>Add contact</strong><small>Keep it private</small></span>

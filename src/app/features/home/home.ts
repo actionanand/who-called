@@ -1,10 +1,11 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DeviceCallHistoryEntry, PrivateContact, TaggedNumber } from '../../core/models/app.models';
+import { CallService } from '../../core/services/call.service';
 import { AppStore } from '../../core/services/app-store.service';
 import { NativeIntegrationService } from '../../core/services/native-integration.service';
 import { contactDisplayName } from '../../core/utils/contact-privacy';
-import { digitsOnly, formatIndianPhone } from '../../core/utils/phone-number';
+import { digitsOnly } from '../../core/utils/phone-number';
 import { AppIcon } from '../../shared/components/app-icon';
 
 interface HomeCallHistoryEntry extends DeviceCallHistoryEntry {
@@ -23,8 +24,7 @@ export class Home {
   protected readonly store = inject(AppStore);
   private readonly native = inject(NativeIntegrationService);
   private readonly router = inject(Router);
-  protected readonly formatPhone = formatIndianPhone;
-  protected readonly displayName = contactDisplayName;
+  private readonly calls = inject(CallService);
   protected readonly callHistory = signal<readonly DeviceCallHistoryEntry[]>([]);
   protected readonly callHistoryLoading = signal(false);
   protected readonly callHistoryError = signal('');
@@ -103,6 +103,17 @@ export class Home {
   protected tagCall(call: HomeCallHistoryEntry): void {
     this.store.pendingTaggedNumber.set(call.number);
     void this.router.navigate(['/tagged'], { queryParams: { add: 1 } });
+  }
+
+  protected callFromHistory(call: HomeCallHistoryEntry): void {
+    if (!this.hasDialableNumber(call.number)) return;
+    void this.calls.confirmAndCall(call.number, call.displayName);
+  }
+
+  protected callIcon(call: DeviceCallHistoryEntry): string {
+    if (call.type === 'outgoing') return 'phone-outgoing';
+    if (['missed', 'rejected', 'blocked'].includes(call.type)) return 'phone-missed';
+    return 'phone-incoming';
   }
 
   protected callTypeLabel(call: DeviceCallHistoryEntry): string {

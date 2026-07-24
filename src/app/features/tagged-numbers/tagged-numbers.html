@@ -46,11 +46,13 @@
             <button type="button" aria-label="Edit tagged number" (click)="openEditor(number)">
               <app-icon name="edit" />
             </button>
-            <a
-              [href]="'tel:' + number.normalizedPhone"
+            <button
+              type="button"
               [attr.aria-label]="'Call ' + number.normalizedPhone"
-              ><app-icon name="phone"
-            /></a>
+              (click)="call(number)"
+            >
+              <app-icon name="phone" />
+            </button>
             <button type="button" aria-label="Delete temporary note" (click)="remove(number.id)">
               <app-icon name="trash" />
             </button>
