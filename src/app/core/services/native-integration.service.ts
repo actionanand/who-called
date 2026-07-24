@@ -129,6 +129,7 @@ export class NativeIntegrationService {
     const nativeWindow = this.document.defaultView;
     if (!nativeWindow) return Promise.reject(new Error('The Android bridge is unavailable.'));
     return new Promise<string>((resolve, reject) => {
+      let timeout: ReturnType<typeof setTimeout> | null = null;
       const handleResult = (event: Event) => {
         const detail = (
           event as CustomEvent<{
@@ -139,16 +140,31 @@ export class NativeIntegrationService {
           }>
         ).detail;
         if (detail.action !== action) return;
+        finish(
+          detail.success,
+          detail.data ?? '',
+          detail.message || 'The Android request could not be completed.',
+        );
+      };
+      const finish = (success: boolean, data: string, message: string): void => {
+        if (timeout) globalThis.clearTimeout(timeout);
         nativeWindow.removeEventListener('who-called-native-result', handleResult);
-        if (detail.success) resolve(detail.data ?? '');
-        else reject(new Error(detail.message || 'The Android request could not be completed.'));
+        if (success) resolve(data);
+        else reject(new Error(message));
       };
       nativeWindow.addEventListener('who-called-native-result', handleResult);
+      timeout = globalThis.setTimeout(
+        () => finish(false, '', 'Biometric authentication timed out.'),
+        60_000,
+      );
       try {
         start();
       } catch (error) {
-        nativeWindow.removeEventListener('who-called-native-result', handleResult);
-        reject(error instanceof Error ? error : new Error('Biometric authentication failed.'));
+        finish(
+          false,
+          '',
+          error instanceof Error ? error.message : 'Biometric authentication failed.',
+        );
       }
     });
   }

@@ -39,6 +39,9 @@ stores the PIN only as AES-GCM ciphertext protected by a non-exportable, authent
 Android Keystore key. A biometric enrollment change invalidates that key, after which the user must
 unlock with the PIN and enable biometrics again.
 
+Enable it from **Settings → Security → Biometric login**. After it is enabled, the application lock
+screen keeps both **Unlock with fingerprint or biometrics** and the application PIN fallback.
+
 Run `npm run android:sync` after changing the native patch. No separate JavaScript package is
 required.
 

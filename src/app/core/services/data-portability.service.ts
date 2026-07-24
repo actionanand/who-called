@@ -111,7 +111,7 @@ export class DataPortabilityService {
         'Notes',
       ],
     ];
-    for (const contact of this.store.contacts()) {
+    for (const contact of this.store.activeContacts()) {
       const phones = contact.phones?.length
         ? contact.phones
         : [
@@ -138,7 +138,7 @@ export class DataPortabilityService {
   }
 
   exportVCard(): void {
-    const cards = this.store.contacts().map((contact) => {
+    const cards = this.store.activeContacts().map((contact) => {
       const phones = contact.phones?.length
         ? contact.phones
         : [{ type: 'Mobile', normalizedNumber: contact.normalizedPhone }];

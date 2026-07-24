@@ -37,7 +37,7 @@ export class Home {
       .map((call) => {
         const key = this.phoneKey(call.number);
         const contact = this.store
-          .contacts()
+          .activeContacts()
           .find((entry) =>
             this.contactNumbers(entry).some((number) => this.phoneKey(number) === key),
           );

@@ -40,6 +40,55 @@
   background: color-mix(in srgb, var(--danger) 12%, var(--surface));
 }
 
+.trash-header-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.trash-header-actions button {
+  min-width: auto;
+  min-height: 2.65rem;
+  padding-inline: 0.75rem;
+}
+
+.trash-header-actions button.danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border-subtle));
+  color: var(--danger);
+}
+
+.trash-toolbar {
+  margin-block: 0.9rem 1.2rem;
+}
+
+.trash-toolbar a,
+.filter-row a {
+  display: inline-flex;
+  min-height: 2.45rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 2rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.filter-row a .filter-count {
+  display: grid;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding-inline: 0.25rem;
+  place-items: center;
+  border-radius: 1rem;
+  color: #fff;
+  background: var(--primary);
+  font-size: 0.68rem;
+}
+
 .search-box {
   display: flex;
   min-height: 3.4rem;
@@ -72,7 +121,11 @@
 }
 
 .filter-row button {
+  display: inline-flex;
   min-height: 2.45rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   padding: 0 0.9rem;
   border: 1px solid var(--border-subtle);
   border-radius: 2rem;
@@ -81,6 +134,12 @@
   font-size: 0.78rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.filter-row .favourites-filter app-icon,
+.filter-row .trash-filter app-icon {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .filter-row button.active {
@@ -130,6 +189,12 @@
   display: grid;
   min-width: 0;
   gap: 0.18rem;
+}
+
+.trash-expiry {
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .name-line {
@@ -662,6 +727,15 @@
 }
 
 @media (max-width: 420px) {
+  .trash-header-actions button span {
+    display: none;
+  }
+
+  .trash-header-actions button {
+    width: 2.65rem;
+    padding: 0;
+  }
+
   .contact-card {
     gap: 0.45rem;
   }
@@ -683,5 +757,36 @@
 
   .two-column {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 719px) {
+  .filter-row .favourites-filter,
+  .filter-row .trash-filter {
+    width: 3rem;
+    min-width: 3rem;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .filter-row .favourites-filter span,
+  .filter-row .trash-filter .filter-label {
+    display: none;
+  }
+
+  .filter-row .favourites-filter app-icon,
+  .filter-row .trash-filter app-icon {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .filter-row .trash-filter {
+    position: relative;
+  }
+
+  .filter-row .trash-filter .filter-count {
+    position: absolute;
+    top: -0.25rem;
+    right: -0.2rem;
   }
 }

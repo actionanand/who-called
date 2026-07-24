@@ -4,11 +4,13 @@ These Android surfaces appear before or outside Angular's WebView, so CSS alone 
 
 ## Biometric prompt
 
-The biometric prompt is an Android system surface and cannot be styled from Angular. Application
-Lock exposes the control only when the native bridge reports an enrolled strong biometric. The
-native bridge wraps the application PIN with an authentication-bound Android Keystore key and
-returns it to Angular only after a successful prompt. Cancellation leaves the application locked;
-adding or removing enrolled biometrics invalidates the key.
+The biometric prompt is an Android system surface and cannot be styled from Angular. The dedicated
+**Settings → Security → Biometric login** control can enable the feature only when the native bridge
+reports an enrolled strong biometric. The lock screen then exposes an explicit fingerprint or
+biometrics button while retaining the application PIN fallback. The native bridge wraps the
+application PIN with an authentication-bound Android Keystore key and returns it to Angular only
+after a successful prompt. Cancellation leaves the application locked; adding or removing enrolled
+biometrics invalidates the key.
 
 ## Branded cold-start splash
 

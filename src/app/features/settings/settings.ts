@@ -11,7 +11,8 @@ import { NativeIntegrationService } from '../../core/services/native-integration
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
 
-type SettingsPanel = 'lock' | 'privacy' | 'country' | 'backup' | 'restore' | 'export' | null;
+type SettingsPanel =
+  'lock' | 'biometric' | 'privacy' | 'country' | 'backup' | 'restore' | 'export' | null;
 
 @Component({
   selector: 'app-settings',
@@ -120,6 +121,10 @@ export class Settings {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected openApplicationLock(): void {
+    this.openPanel('lock');
   }
 
   protected async toggleScreenshotProtection(): Promise<void> {

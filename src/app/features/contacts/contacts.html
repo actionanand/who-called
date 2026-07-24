@@ -5,13 +5,23 @@
         <p class="selection-eyebrow">Selection</p>
         <h1>{{ selectedIds().size }} selected</h1>
       } @else {
-        <h1>Private contacts</h1>
-        <p>Separate from your Android address book.</p>
+        <h1>{{ trashView() ? 'Trash' : 'Private contacts' }}</h1>
+        <p>
+          {{
+            trashView()
+              ? 'Deleted contacts are kept for 30 days.'
+              : 'Separate from your Android address book.'
+          }}
+        </p>
       }
     </div>
     @if (selectionMode()) {
       <div class="selection-actions">
-        @if (selectedIds().size === 1) {
+        @if (trashView()) {
+          <button type="button" aria-label="Restore selected contacts" (click)="restoreSelection()">
+            <app-icon name="restore" />
+          </button>
+        } @else if (selectedIds().size === 1) {
           <button type="button" aria-label="Edit selected contact" (click)="editSelection()">
             <app-icon name="edit" />
           </button>
@@ -29,9 +39,30 @@
         </button>
       </div>
     } @else {
-      <button class="primary-button add-button" type="button" (click)="openEditor()">
-        <app-icon name="user-plus" /> <span>Add</span>
-      </button>
+      @if (trashView()) {
+        <div class="trash-header-actions">
+          <button
+            class="secondary-button"
+            type="button"
+            [disabled]="!store.trashedContacts().length"
+            (click)="restoreAll()"
+          >
+            <app-icon name="restore" /> <span>Restore all</span>
+          </button>
+          <button
+            class="secondary-button danger"
+            type="button"
+            [disabled]="!store.trashedContacts().length"
+            (click)="emptyTrash()"
+          >
+            <app-icon name="trash" /> <span>Empty</span>
+          </button>
+        </div>
+      } @else {
+        <button class="primary-button add-button" type="button" (click)="openEditor()">
+          <app-icon name="user-plus" /> <span>Add</span>
+        </button>
+      }
     }
   </header>
 
@@ -46,12 +77,33 @@
     />
   </label>
 
-  <div class="filter-row" aria-label="Contact filters">
-    <button class="active" type="button">All</button>
-    <button type="button">Favourites</button>
-    <button type="button">WhatsApp</button>
-    <button type="button">Has notes</button>
-  </div>
+  @if (trashView()) {
+    <div class="trash-toolbar">
+      <a routerLink="/contacts"><app-icon name="chevron-left" /> Back to contacts</a>
+    </div>
+  } @else {
+    <div class="filter-row" aria-label="Contact filters">
+      <button class="active" type="button">All</button>
+      <button class="favourites-filter" type="button" aria-label="Favourites">
+        <app-icon name="favorite" />
+        <span>Favourites</span>
+      </button>
+      <button type="button">WhatsApp</button>
+      <button type="button">Has notes</button>
+      <a
+        class="trash-filter"
+        routerLink="/contacts"
+        [queryParams]="{ trash: 1 }"
+        aria-label="Trash"
+      >
+        <app-icon name="trash" />
+        <span class="filter-label">Trash</span>
+        @if (store.trashedContacts().length) {
+          <span class="filter-count">{{ store.trashedContacts().length }}</span>
+        }
+      </a>
+    </div>
+  }
 
   @if (store.loading()) {
     <p class="status">Opening your encrypted contacts…</p>
@@ -114,40 +166,58 @@
             @if (contact.notes) {
               <p>{{ contact.notes }}</p>
             }
+            @if (trashView()) {
+              <span class="trash-expiry">
+                Permanently deleted in {{ daysRemaining(contact) }}
+                {{ daysRemaining(contact) === 1 ? 'day' : 'days' }}
+              </span>
+            }
           </div>
-          <div class="row-actions">
-            @if (whatsappPhones(contact).length) {
+          @if (!trashView()) {
+            <div class="row-actions">
+              @if (whatsappPhones(contact).length) {
+                <button
+                  type="button"
+                  [attr.aria-label]="'Open WhatsApp chat with ' + displayName(contact)"
+                  (click)="openPhoneAction(contact, 'whatsapp')"
+                >
+                  <app-icon name="message" />
+                </button>
+              }
               <button
                 type="button"
-                [attr.aria-label]="'Open WhatsApp chat with ' + displayName(contact)"
-                (click)="openPhoneAction(contact, 'whatsapp')"
+                [attr.aria-label]="'Call ' + displayName(contact)"
+                (click)="openPhoneAction(contact, 'call')"
               >
-                <app-icon name="message" />
+                <app-icon name="phone" />
               </button>
-            }
-            <button
-              type="button"
-              [attr.aria-label]="'Call ' + displayName(contact)"
-              (click)="openPhoneAction(contact, 'call')"
-            >
-              <app-icon name="phone" />
-            </button>
-          </div>
+            </div>
+          }
         </article>
       }
     </section>
   } @else {
     <section class="card empty-state">
       <span class="empty-icon"><app-icon name="contacts" /></span>
-      <h3>{{ search() ? 'No matching contacts' : 'Your private list is empty' }}</h3>
+      <h3>
+        {{
+          search()
+            ? 'No matching contacts'
+            : trashView()
+              ? 'Trash is empty'
+              : 'Your private list is empty'
+        }}
+      </h3>
       <p>
         {{
           search()
             ? 'Try a name, email, social profile, note, or part of a phone number.'
-            : 'Contacts saved here do not appear in Android Contacts.'
+            : trashView()
+              ? 'Deleted contacts will appear here for up to 30 days.'
+              : 'Contacts saved here do not appear in Android Contacts.'
         }}
       </p>
-      @if (!search()) {
+      @if (!search() && !trashView()) {
         <button class="primary-button" type="button" (click)="openEditor()">
           <app-icon name="user-plus" /> Add contact
         </button>
@@ -553,14 +623,16 @@
         </section>
       }
 
-      <div class="details-actions">
-        <button class="secondary-button" type="button" (click)="editContact(contact)">
-          <app-icon name="edit" /> Edit
-        </button>
-        <button class="primary-button" type="button" (click)="openPhoneAction(contact, 'call')">
-          <app-icon name="phone" /> Call
-        </button>
-      </div>
+      @if (!trashView()) {
+        <div class="details-actions">
+          <button class="secondary-button" type="button" (click)="editContact(contact)">
+            <app-icon name="edit" /> Edit
+          </button>
+          <button class="primary-button" type="button" (click)="openPhoneAction(contact, 'call')">
+            <app-icon name="phone" /> Call
+          </button>
+        </div>
+      }
     </div>
   </section>
 }
