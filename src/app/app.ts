@@ -34,6 +34,7 @@ export class App {
   private readonly security = inject(SecurityService);
   protected readonly unlockPin = signal('');
   protected readonly unlockError = signal('');
+  protected readonly biometricBusy = signal(false);
 
   constructor() {
     const sharedText = this.native.consumeSharedText();
@@ -62,12 +63,13 @@ export class App {
     }
   }
 
-  protected biometricAvailable(): boolean {
-    return this.store.settings().biometricEnabled && this.security.biometricAvailable();
+  protected biometricEnabled(): boolean {
+    return this.store.settings().biometricEnabled && this.native.isAndroid();
   }
 
   protected async unlockWithBiometric(): Promise<void> {
     this.unlockError.set('');
+    this.biometricBusy.set(true);
     try {
       if (!(await this.security.unlockWithBiometric())) {
         this.unlockError.set('Biometric unlock could not verify this application.');
@@ -76,6 +78,8 @@ export class App {
       this.unlockError.set(
         error instanceof Error ? error.message : 'Biometric authentication was cancelled.',
       );
+    } finally {
+      this.biometricBusy.set(false);
     }
   }
 }

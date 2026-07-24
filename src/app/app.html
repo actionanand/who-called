@@ -67,9 +67,15 @@
         <small>{{ unlockError() }}</small>
       }
       <button class="primary-button" type="submit">Unlock</button>
-      @if (biometricAvailable()) {
-        <button class="secondary-button" type="button" (click)="unlockWithBiometric()">
-          <app-icon name="biometric" /> Unlock with biometrics
+      @if (biometricEnabled()) {
+        <button
+          class="secondary-button"
+          type="button"
+          [disabled]="biometricBusy()"
+          (click)="unlockWithBiometric()"
+        >
+          <app-icon name="biometric" />
+          {{ biometricBusy() ? 'Waiting for Android…' : 'Unlock with fingerprint or biometrics' }}
         </button>
       }
     </form>
