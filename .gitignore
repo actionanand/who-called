@@ -14,7 +14,6 @@ yarn-error.log
 /keystore.b64.txt
 /who-called-key.pem
 /who-called-cert.pem
-/releases
 /reference
 
 # IDEs and editors
