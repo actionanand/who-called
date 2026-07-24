@@ -90,10 +90,16 @@
       </button>
       <button type="button">WhatsApp</button>
       <button type="button">Has notes</button>
-      <a routerLink="/contacts" [queryParams]="{ trash: 1 }">
-        <app-icon name="trash" /> Trash
+      <a
+        class="trash-filter"
+        routerLink="/contacts"
+        [queryParams]="{ trash: 1 }"
+        aria-label="Trash"
+      >
+        <app-icon name="trash" />
+        <span class="filter-label">Trash</span>
         @if (store.trashedContacts().length) {
-          <span>{{ store.trashedContacts().length }}</span>
+          <span class="filter-count">{{ store.trashedContacts().length }}</span>
         }
       </a>
     </div>

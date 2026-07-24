@@ -77,7 +77,7 @@
   white-space: nowrap;
 }
 
-.filter-row a span {
+.filter-row a .filter-count {
   display: grid;
   min-width: 1.3rem;
   height: 1.3rem;
@@ -136,7 +136,8 @@
   white-space: nowrap;
 }
 
-.filter-row .favourites-filter app-icon {
+.filter-row .favourites-filter app-icon,
+.filter-row .trash-filter app-icon {
   width: 1.05rem;
   height: 1.05rem;
 }
@@ -760,12 +761,32 @@
 }
 
 @media (max-width: 719px) {
-  .filter-row .favourites-filter {
-    width: 2.45rem;
+  .filter-row .favourites-filter,
+  .filter-row .trash-filter {
+    width: 3rem;
+    min-width: 3rem;
+    justify-content: center;
     padding: 0;
   }
 
-  .filter-row .favourites-filter span {
+  .filter-row .favourites-filter span,
+  .filter-row .trash-filter .filter-label {
     display: none;
+  }
+
+  .filter-row .favourites-filter app-icon,
+  .filter-row .trash-filter app-icon {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .filter-row .trash-filter {
+    position: relative;
+  }
+
+  .filter-row .trash-filter .filter-count {
+    position: absolute;
+    top: -0.25rem;
+    right: -0.2rem;
   }
 }
