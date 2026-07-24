@@ -1,1 +1,0 @@
-import {S,q as tt,a7 as X1,a8 as Y}from'./main-MIQ2VHRU.js';function w(t){t||(t=S(tt));let i=new Y(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(X1(i))}export{w};

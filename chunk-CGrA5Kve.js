@@ -1,0 +1,1 @@
+import {S,t as tt,a8 as K1,a9 as ee}from'./main-H5UG5K3O.js';function w(t){t||(t=S(tt));let i=new ee(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(K1(i))}export{w};
