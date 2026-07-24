@@ -29,6 +29,8 @@ Verify a force-stopped cold launch on Android 12+ and one older supported versio
 The Angular theme service sends the effective theme to `WhoCalledSystemBars.setDarkMode(...)`. Native code then:
 
 - Sets status and navigation bar backgrounds to `#F4F7F4` in light mode or `#0E1713` in dark mode.
+- Applies the same resolved color to the Android window, decor view and WebView so gesture-navigation
+  areas cannot reveal the opposite theme underneath the app.
 - Enables dark system icons on light bars and light system icons on dark bars.
 - Disables Android's automatic contrast scrims where supported.
 - Reapplies the style when the app resumes or regains focus.

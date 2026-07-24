@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: AppSettings & { readonly id: string } = {
   defaultCallingCode: '+91',
   recentActivityEnabled: true,
   whatsappBusinessFallback: true,
-  deviceCallHistoryEnabled: false,
+  deviceCallHistoryEnabled: true,
   screenshotProtection: true,
   pinEnabled: false,
   biometricEnabled: false,
@@ -38,11 +38,12 @@ export class AppStore {
   readonly storageError = signal(false);
   readonly pendingSharedText = signal('');
   readonly pendingContactDraft = signal<{
-    readonly taggedNumberId: string;
+    readonly taggedNumberId?: string;
     readonly phone: string;
     readonly note: string;
     readonly tag: string;
   } | null>(null);
+  readonly pendingTaggedNumber = signal('');
   readonly quickActionsOpen = signal(false);
   readonly locked = signal(false);
   readonly visibleContacts = computed(() =>

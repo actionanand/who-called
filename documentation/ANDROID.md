@@ -97,26 +97,29 @@ npm run keystore:type
 
 Never commit the keystore, its Base64 representation or any password. Keep an offline backup; losing the release key can prevent future Play Store updates.
 
-## Optional device call history
+## Device call history
 
-Call history is disabled by default:
+Phone call history is enabled in the Android workflow because it is a primary Who Called? feature.
+The generated application declares `READ_CALL_LOG`, requests it at runtime, and reads at most the
+100 most recent entries only after the user grants access. Numbers are matched locally against
+Who Called? contacts and tagged numbers.
 
-```text
-ENABLE_DEVICE_CALL_LOG=false
-```
-
-When disabled, `scripts/patch-android.mjs` removes `READ_CALL_LOG` from the manifest and the app must use permission-free recent activity. Restricted or Play-distributed builds should keep it disabled. For a separately distributed build where the feature is justified:
+To produce a permission-free build, disable the feature while generating the native shell:
 
 ```bash
-ENABLE_DEVICE_CALL_LOG=true npm run android:sync
+ENABLE_DEVICE_CALL_LOG=false npm run android:sync
 ```
 
-The app must request the permission only after the user enables the corresponding setting and must remain useful when it is denied.
+`READ_CALL_LOG` is a restricted Google Play permission. A Play-distributed build must satisfy the
+current Call Log permission policy or be distributed through an appropriate non-Play channel. The
+application remains usable when permission is denied.
 
 ## Security notes
 
 - `public/who-called.png` is the canonical brand input and has a transparent background.
 - Android notification small icons are monochrome white artwork on transparency. Android supplies the system tint for light and dark surfaces.
+- The native theme bridge updates the status bar, navigation bar, window, decor view and WebView
+  backgrounds together, then reapplies the selected appearance when the window regains focus.
 - The normal call flow uses `ACTION_DIAL`, so direct-call permission is not required.
 - The normal SMS flow opens the composer, so SMS-send permission is not required.
 - The share target accepts user-selected plain text; it does not read the SMS inbox.

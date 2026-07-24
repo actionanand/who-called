@@ -1,11 +1,17 @@
 import { DOCUMENT } from '@angular/common';
 import { inject, Injectable } from '@angular/core';
+import { DeviceCallHistoryEntry, DeviceCallType } from '../models/app.models';
+
+export type WhatsAppPackage = 'com.whatsapp' | 'com.whatsapp.w4b';
 
 interface WhoCalledNativeBridge {
   consumeSharedText(): string;
   openWhatsApp(number: string, message: string, businessFallback: boolean): void;
+  availableWhatsAppApps(): string;
+  openWhatsAppIn(number: string, message: string, packageName: string): void;
   setScreenshotProtection(enabled: boolean): void;
   deviceCallHistorySupported(): boolean;
+  requestDeviceCallHistory(): void;
   appVersion(): string;
   isBiometricAvailable(): boolean;
   enableBiometric(secret: string): void;
@@ -32,12 +38,44 @@ export class NativeIntegrationService {
     return true;
   }
 
+  availableWhatsAppApps(): readonly WhatsAppPackage[] {
+    const value = this.bridge()?.availableWhatsAppApps();
+    if (!value) return [];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (entry): entry is WhatsAppPackage =>
+          entry === 'com.whatsapp' || entry === 'com.whatsapp.w4b',
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  openWhatsAppIn(number: string, message: string, packageName: WhatsAppPackage): boolean {
+    const bridge = this.bridge();
+    if (!bridge) return false;
+    bridge.openWhatsAppIn(number, message, packageName);
+    return true;
+  }
+
   setScreenshotProtection(enabled: boolean): void {
     this.bridge()?.setScreenshotProtection(enabled);
   }
 
   deviceCallHistorySupported(): boolean {
     return this.bridge()?.deviceCallHistorySupported() ?? false;
+  }
+
+  requestDeviceCallHistory(): Promise<readonly DeviceCallHistoryEntry[]> {
+    const bridge = this.bridge();
+    if (!bridge) {
+      return Promise.reject(new Error('Phone call history is available only on Android.'));
+    }
+    return this.waitForNativeResult('call-history', () => bridge.requestDeviceCallHistory()).then(
+      (value) => this.parseCallHistory(value),
+    );
   }
 
   isAndroid(): boolean {
@@ -90,7 +128,7 @@ export class NativeIntegrationService {
         if (detail.action !== action) return;
         nativeWindow.removeEventListener('who-called-native-result', handleResult);
         if (detail.success) resolve(detail.data ?? '');
-        else reject(new Error(detail.message || 'Biometric authentication was cancelled.'));
+        else reject(new Error(detail.message || 'The Android request could not be completed.'));
       };
       nativeWindow.addEventListener('who-called-native-result', handleResult);
       try {
@@ -100,5 +138,51 @@ export class NativeIntegrationService {
         reject(error instanceof Error ? error : new Error('Biometric authentication failed.'));
       }
     });
+  }
+
+  private parseCallHistory(value: string): readonly DeviceCallHistoryEntry[] {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.flatMap((entry): readonly DeviceCallHistoryEntry[] => {
+        if (!this.isRecord(entry)) return [];
+        const type = this.callType(entry['type']);
+        const timestamp = this.numberValue(entry['timestamp']);
+        const durationSeconds = this.numberValue(entry['durationSeconds']);
+        return [
+          {
+            id: String(entry['id'] ?? `${timestamp}-${String(entry['number'] ?? '')}`),
+            number: String(entry['number'] ?? ''),
+            cachedName: String(entry['cachedName'] ?? ''),
+            type,
+            timestamp,
+            durationSeconds,
+          },
+        ];
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private numberValue(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  }
+
+  private callType(value: unknown): DeviceCallType {
+    const types: readonly DeviceCallType[] = [
+      'incoming',
+      'outgoing',
+      'missed',
+      'rejected',
+      'blocked',
+      'voicemail',
+      'unknown',
+    ];
+    return types.includes(value as DeviceCallType) ? (value as DeviceCallType) : 'unknown';
   }
 }

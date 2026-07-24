@@ -1,16 +1,20 @@
+import { NgOptimizedImage } from '@angular/common';
 import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AppStore } from '../../core/services/app-store.service';
 import { SORTED_COUNTRY_CODES } from '../../core/data/country-codes';
-import { NativeIntegrationService } from '../../core/services/native-integration.service';
+import {
+  NativeIntegrationService,
+  WhatsAppPackage,
+} from '../../core/services/native-integration.service';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
 import { buildWhatsAppUrl, normalizePhone } from '../../core/utils/phone-number';
 
 @Component({
   selector: 'app-whatsapp',
-  imports: [AppIcon, ReactiveFormsModule, SelectPicker],
+  imports: [AppIcon, NgOptimizedImage, ReactiveFormsModule, SelectPicker],
   templateUrl: './whatsapp.html',
   styleUrl: './whatsapp.scss',
 })
@@ -20,6 +24,11 @@ export class WhatsApp {
   private readonly destroyRef = inject(DestroyRef);
   protected readonly store = inject(AppStore);
   protected readonly attempted = signal(false);
+  protected readonly appChoice = signal<{
+    readonly number: string;
+    readonly message: string;
+    readonly packages: readonly WhatsAppPackage[];
+  } | null>(null);
   protected readonly countryOptions: readonly SelectPickerOption[] = SORTED_COUNTRY_CODES.map(
     (country) => ({
       value: country.name,
@@ -96,6 +105,21 @@ export class WhatsApp {
     }
     const value = this.form.getRawValue();
     const normalized = normalizePhone(value.callingCode, value.number);
+    const packages = this.native.availableWhatsAppApps();
+    if (packages.length > 1) {
+      this.appChoice.set({
+        number: normalized.slice(1),
+        message: value.message.trim(),
+        packages,
+      });
+      return;
+    }
+    if (
+      packages.length === 1 &&
+      this.native.openWhatsAppIn(normalized.slice(1), value.message.trim(), packages[0])
+    ) {
+      return;
+    }
     if (
       this.native.openWhatsApp(
         normalized.slice(1),
@@ -105,6 +129,25 @@ export class WhatsApp {
     )
       return;
     window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  protected closeAppChoice(): void {
+    this.appChoice.set(null);
+  }
+
+  protected openIn(packageName: WhatsAppPackage): void {
+    const choice = this.appChoice();
+    if (!choice) return;
+    this.closeAppChoice();
+    this.native.openWhatsAppIn(choice.number, choice.message, packageName);
+  }
+
+  protected appName(packageName: WhatsAppPackage): string {
+    return packageName === 'com.whatsapp.w4b' ? 'WhatsApp Business' : 'WhatsApp';
+  }
+
+  protected appIcon(packageName: WhatsAppPackage): string {
+    return packageName === 'com.whatsapp.w4b' ? '/whatsapp-business.png' : '/whatsapp.png';
   }
 
   protected pasteNumber(): void {
