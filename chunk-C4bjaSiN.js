@@ -1,1 +1,0 @@
-import {S,i as et,Y as q1,Z as J}from'./main-L3ZBIHHO.js';function w(t){t||(t=S(et));let i=new J(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(q1(i))}export{w};

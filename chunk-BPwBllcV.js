@@ -1,0 +1,1 @@
+import {S,q as et,a5 as $1,a6 as J}from'./main-6QUGWF4J.js';function w(t){t||(t=S(et));let i=new J(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe($1(i))}export{w};
