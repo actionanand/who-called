@@ -2,7 +2,7 @@ import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   ContactEmail,
   ContactPhone,
@@ -62,7 +62,7 @@ interface PhoneChoiceSheet {
 
 @Component({
   selector: 'app-contacts',
-  imports: [AppIcon, ReactiveFormsModule, SelectPicker, WhatsAppAppChooser],
+  imports: [AppIcon, ReactiveFormsModule, RouterLink, SelectPicker, WhatsAppAppChooser],
   templateUrl: './contacts.html',
   styleUrl: './contacts.scss',
 })
@@ -87,6 +87,7 @@ export class Contacts {
   } | null>(null);
   protected readonly selectedContact = signal<PrivateContact | null>(null);
   protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly trashView = signal(false);
   protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
   protected readonly selectedContacts = computed(() => {
     const ids = this.selectedIds();
@@ -99,10 +100,11 @@ export class Contacts {
   protected readonly dobModes = DOB_MODES;
 
   protected readonly filteredContacts = computed(() => {
+    const contacts = this.trashView() ? this.store.trashedContacts() : this.store.visibleContacts();
     const query = this.search().trim().toLocaleLowerCase();
-    if (!query) return this.store.visibleContacts();
+    if (!query) return contacts;
     const phoneQuery = digitsOnly(query);
-    return this.store.contacts().filter((contact) => {
+    return contacts.filter((contact) => {
       const phoneValues = (contact.phones ?? []).map((phone) => phone.number).join(' ');
       const emailValues = (contact.emails ?? []).map((email) => email.value).join(' ');
       const socialValues = (contact.socialLinks ?? []).map((link) => link.url).join(' ');
@@ -137,6 +139,8 @@ export class Contacts {
       this.cancelHold();
     });
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parameters) => {
+      this.trashView.set(parameters.has('trash'));
+      this.clearSelection();
       if (parameters.has('add')) this.openEditor();
     });
   }
@@ -366,6 +370,7 @@ export class Contacts {
   }
 
   protected editSelection(): void {
+    if (this.trashView()) return;
     const contact = this.selectedContacts()[0];
     if (this.selectedIds().size !== 1 || !contact) return;
     this.clearSelection();
@@ -375,20 +380,80 @@ export class Contacts {
   protected async deleteSelection(): Promise<void> {
     const contacts = this.selectedContacts();
     if (!contacts.length) return;
+    const permanently = this.trashView();
     const confirmed = await this.feedback.confirm({
-      title: contacts.length === 1 ? 'Delete selected contact?' : 'Delete selected contacts?',
-      message:
-        contacts.length === 1
-          ? `${contacts[0].name} will be removed from Who Called?. Device call history will not be deleted.`
-          : `${contacts.length} contacts will be removed from Who Called?. Device call history will not be deleted.`,
-      confirmLabel: contacts.length === 1 ? 'Delete contact' : `Delete ${contacts.length} contacts`,
+      title: permanently
+        ? contacts.length === 1
+          ? 'Delete contact permanently?'
+          : 'Delete contacts permanently?'
+        : contacts.length === 1
+          ? 'Move contact to Trash?'
+          : 'Move contacts to Trash?',
+      message: permanently
+        ? 'This cannot be undone. Device call history will not be deleted.'
+        : 'You can restore them from Trash for the next 30 days.',
+      confirmLabel: permanently
+        ? contacts.length === 1
+          ? 'Delete permanently'
+          : `Delete ${contacts.length} permanently`
+        : contacts.length === 1
+          ? 'Move to Trash'
+          : `Move ${contacts.length} to Trash`,
+    });
+    if (!confirmed) return;
+    for (const contact of contacts) {
+      if (permanently) await this.store.removeContact(contact.id);
+      else await this.store.trashContact(contact.id);
+    }
+    this.clearSelection();
+    this.feedback.notify(
+      permanently
+        ? contacts.length === 1
+          ? `${contacts[0].name} permanently deleted`
+          : `${contacts.length} contacts permanently deleted`
+        : contacts.length === 1
+          ? `${contacts[0].name} moved to Trash`
+          : `${contacts.length} contacts moved to Trash`,
+    );
+  }
+
+  protected async restoreSelection(): Promise<void> {
+    const contacts = this.selectedContacts();
+    for (const contact of contacts) await this.store.restoreContact(contact.id);
+    this.clearSelection();
+    this.feedback.notify(
+      contacts.length === 1
+        ? `${contacts[0].name} restored`
+        : `${contacts.length} contacts restored`,
+    );
+  }
+
+  protected async restoreAll(): Promise<void> {
+    const contacts = this.store.trashedContacts();
+    if (!contacts.length) return;
+    for (const contact of contacts) await this.store.restoreContact(contact.id);
+    this.clearSelection();
+    this.feedback.notify(`${contacts.length} contacts restored`);
+  }
+
+  protected async emptyTrash(): Promise<void> {
+    const contacts = this.store.trashedContacts();
+    if (!contacts.length) return;
+    const confirmed = await this.feedback.confirm({
+      title: 'Empty Trash?',
+      message: `${contacts.length} contacts will be deleted permanently. This cannot be undone.`,
+      confirmLabel: 'Empty Trash',
     });
     if (!confirmed) return;
     for (const contact of contacts) await this.store.removeContact(contact.id);
     this.clearSelection();
-    this.feedback.notify(
-      contacts.length === 1 ? `${contacts[0].name} deleted` : `${contacts.length} contacts deleted`,
-    );
+    this.feedback.notify('Trash emptied');
+  }
+
+  protected daysRemaining(contact: PrivateContact): number {
+    if (!contact.deletedAt) return 30;
+    const elapsed = Date.now() - Date.parse(contact.deletedAt);
+    return Math.max(1, 30 - Math.floor(elapsed / (24 * 60 * 60 * 1000)));
   }
 
   protected displayName(contact: PrivateContact): string {
