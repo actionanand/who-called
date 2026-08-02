@@ -36,6 +36,19 @@ are invoked by name at runtime, so the patch adds this rule to the generated
 This keeps the application’s existing native bridge working while allowing unrelated native code
 to be optimized.
 
+Google Tink also references the JSR-305 `Nullable` and `GuardedBy` annotations in its bytecode.
+Those annotations are build-time metadata and are not part of the Android runtime. The generated
+ProGuard configuration therefore includes the two narrow rules recommended by R8's missing-class
+report:
+
+```proguard
+-dontwarn javax.annotation.Nullable
+-dontwarn javax.annotation.concurrent.GuardedBy
+```
+
+These rules suppress only the absent annotation definitions. They do not keep, remove, or alter
+Tink cryptographic code.
+
 ## Mapping-file generation and retention
 
 Every optimized release produces a mapping unique to that exact build:
