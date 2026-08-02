@@ -67,12 +67,15 @@ The workflow runs manually, on `main-android`, and on `v*` tags.
   `who-called-<version>.aab` files.
 - When signing secrets are missing or signing fails, CI publishes clearly named
   `who-called-<version>-unsigned.apk` and `who-called-<version>-unsigned.aab` files instead.
-- Artifacts and `playstore-icon.png` are uploaded for 30 days, and a missing APK or AAB fails the
-  workflow instead of producing an empty successful run.
+- Artifacts, the exact R8 `mapping.txt`, and `playstore-icon.png` are uploaded for 30 days. A
+  missing APK, AAB, or mapping file fails the workflow instead of producing an incomplete release.
 - Builds on `main-android` also commit the generated files to the branch under `releases/`.
 - Tag builds also create a GitHub Release.
 
-The CI environment uses minimum SDK 24, target SDK 35, Java 21 and Node 24.16.
+The CI environment uses minimum SDK 24, target SDK 36, Java 21 and Node 24.16.
+
+Release builds use R8 code optimization and resource shrinking. See
+[R8-DEOBFUSCATION.md](R8-DEOBFUSCATION.md) for mapping-file handling and Play Console guidance.
 
 ## Signing secrets
 
