@@ -46,7 +46,10 @@ npm run android:sync
 npm run android:open
 ```
 
-See [ANDROID.md](ANDROID.md) for CI, signing, versions and local troubleshooting. See [ANDROID_SPECIAL_CASES.md](ANDROID_SPECIAL_CASES.md) before changing the splash screen, system bars, notification icon, share target or optional call-log flag.
+See [ANDROID.md](ANDROID.md) for CI, signing, versions and local troubleshooting. See
+[R8-DEOBFUSCATION.md](R8-DEOBFUSCATION.md) for release optimization and Play Console mapping-file
+handling. See [ANDROID_SPECIAL_CASES.md](ANDROID_SPECIAL_CASES.md) before changing the splash
+screen, system bars, notification icon, share target or optional call-log flag.
 
 ## Privacy model
 
