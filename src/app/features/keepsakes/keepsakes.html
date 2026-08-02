@@ -1,0 +1,182 @@
+<div class="page keepsakes-page">
+  <header class="page-heading keepsake-heading">
+    <div>
+      <p class="eyebrow">People and moments</p>
+      <h1>Keepsakes</h1>
+      <p>Track birthdays and anniversaries alongside each contact.</p>
+    </div>
+    <span class="heading-icon"><app-icon name="keepsake" /></span>
+  </header>
+
+  <div class="kind-tabs" aria-label="Keepsake type">
+    <button
+      type="button"
+      [class.active]="kind() === 'all'"
+      [attr.aria-pressed]="kind() === 'all'"
+      (click)="setKind('all')"
+    >
+      All
+    </button>
+    <button
+      type="button"
+      [class.active]="kind() === 'birthday'"
+      [attr.aria-pressed]="kind() === 'birthday'"
+      (click)="setKind('birthday')"
+    >
+      <app-icon name="birthday" /> Birthdays
+    </button>
+    <button
+      type="button"
+      [class.active]="kind() === 'anniversary'"
+      [attr.aria-pressed]="kind() === 'anniversary'"
+      (click)="setKind('anniversary')"
+    >
+      <app-icon name="keepsake" /> Anniversaries
+    </button>
+  </div>
+
+  <div class="view-row">
+    <div class="period-tabs" aria-label="Date range">
+      @for (option of periods; track option.value) {
+        <button
+          type="button"
+          [class.active]="period() === option.value && view() === 'list'"
+          [attr.aria-pressed]="period() === option.value && view() === 'list'"
+          (click)="setPeriod(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+    <button
+      class="calendar-toggle"
+      type="button"
+      [class.active]="view() === 'calendar'"
+      [attr.aria-pressed]="view() === 'calendar'"
+      (click)="setView('calendar')"
+    >
+      <app-icon name="calendar" /> Calendar
+    </button>
+  </div>
+
+  @if (view() === 'calendar') {
+    <section class="card calendar-card" aria-labelledby="calendar-title">
+      <header>
+        <button type="button" aria-label="Previous month" (click)="moveMonth(-1)">
+          <app-icon name="chevron-left" />
+        </button>
+        <h2 id="calendar-title">{{ monthLabel() }}</h2>
+        <button type="button" aria-label="Next month" (click)="moveMonth(1)">
+          <app-icon name="chevron" />
+        </button>
+      </header>
+      <div class="weekdays" aria-hidden="true">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span
+        ><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="calendar-grid">
+        @for (blank of leadingBlanks(); track $index) {
+          <span></span>
+        }
+        @for (cell of calendarCells(); track cell.key) {
+          <button
+            type="button"
+            [class.today]="cell.today"
+            [class.selected]="selectedDate() === cell.key"
+            [class.has-events]="cell.events.length"
+            [attr.aria-label]="cell.day + ', ' + cell.events.length + ' keepsakes'"
+            [attr.aria-pressed]="selectedDate() === cell.key"
+            (click)="chooseDate(cell.key)"
+          >
+            <span>{{ cell.day }}</span>
+            @if (cell.events.length) {
+              <small>{{ cell.events.length }}</small>
+            }
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="event-stack" aria-label="Selected date keepsakes">
+      @for (event of selectedEvents(); track event.id) {
+        <article class="card event-card">
+          <span class="date-tile">
+            <strong>{{ event.day }}</strong>
+            <small>{{ event.kind === 'birthday' ? 'DOB' : 'ANN' }}</small>
+          </span>
+          <div>
+            <span class="event-kind">
+              <app-icon [name]="event.kind === 'birthday' ? 'birthday' : 'keepsake'" />
+              {{ event.label }}
+            </span>
+            <h2>{{ event.contact.name }}</h2>
+            @if (yearsLabel(event)) {
+              <small>{{ yearsLabel(event) }}</small>
+            }
+          </div>
+          <div class="event-actions">
+            @if (event.reminderEnabled) {
+              <span class="reminder-on" aria-label="Reminder enabled">
+                <app-icon name="alert" />
+              </span>
+            }
+            <a
+              routerLink="/contacts"
+              [queryParams]="{ edit: event.contact.id }"
+              [attr.aria-label]="'Edit ' + event.contact.name"
+            >
+              <app-icon name="edit" />
+            </a>
+          </div>
+        </article>
+      } @empty {
+        <div class="card empty-day">No birthdays or anniversaries on this date.</div>
+      }
+    </section>
+  } @else {
+    <section class="event-stack" aria-live="polite">
+      @for (event of events(); track event.id) {
+        <article class="card event-card">
+          <span class="date-tile">
+            <strong>{{ event.nextDate.getDate() }}</strong>
+            <small>{{ event.nextDate.toLocaleDateString('en-IN', { month: 'short' }) }}</small>
+          </span>
+          <div>
+            <span class="event-kind">
+              <app-icon [name]="event.kind === 'birthday' ? 'birthday' : 'keepsake'" />
+              {{ event.label }}
+            </span>
+            <h2>{{ event.contact.name }}</h2>
+            <p>{{ eventDate(event) }} · {{ timing(event) }}</p>
+            @if (yearsLabel(event)) {
+              <small>{{ yearsLabel(event) }}</small>
+            }
+          </div>
+          <div class="event-actions">
+            @if (event.reminderEnabled) {
+              <span class="reminder-on" aria-label="Reminder enabled">
+                <app-icon name="alert" />
+              </span>
+            }
+            <a
+              routerLink="/contacts"
+              [queryParams]="{ edit: event.contact.id }"
+              [attr.aria-label]="'Edit ' + event.contact.name"
+            >
+              <app-icon name="edit" />
+            </a>
+          </div>
+        </article>
+      } @empty {
+        <section class="card empty-state">
+          <span class="empty-icon"><app-icon name="calendar" /></span>
+          <h2>No keepsakes here</h2>
+          <p>Add a birthday or anniversary while creating or editing a contact.</p>
+          <a class="primary-button" routerLink="/contacts" [queryParams]="{ add: 1 }">
+            <app-icon name="user-plus" /> Add contact
+          </a>
+        </section>
+      }
+    </section>
+  }
+</div>

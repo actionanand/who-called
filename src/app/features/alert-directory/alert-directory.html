@@ -1,0 +1,67 @@
+<div class="page alerts-page">
+  <header class="page-heading alert-heading">
+    <div>
+      <p class="eyebrow">6:00 AM yearly notifications</p>
+      <h1>Alert Directory</h1>
+      <p>Contacts with at least one active birthday or anniversary reminder.</p>
+    </div>
+    <span class="heading-icon"><app-icon name="alert" /></span>
+  </header>
+
+  @if (contacts().length) {
+    <section class="alert-stack" aria-label="Contacts with active reminders">
+      @for (item of contacts(); track item.contact.id) {
+        <article class="card alert-card">
+          <header>
+            <span class="avatar">{{ item.contact.name.slice(0, 1).toUpperCase() }}</span>
+            <div>
+              <h2>{{ displayName(item.contact) }}</h2>
+              <p>
+                {{ item.events.length }}
+                {{ item.events.length === 1 ? 'active reminder' : 'active reminders' }}
+              </p>
+            </div>
+            <a
+              routerLink="/contacts"
+              [queryParams]="{ edit: item.contact.id }"
+              [attr.aria-label]="'Edit reminders for ' + displayName(item.contact)"
+            >
+              <app-icon name="edit" />
+            </a>
+          </header>
+          <div class="reminder-list">
+            @for (event of item.events; track event.id) {
+              <div class="reminder-row">
+                <span class="reminder-icon">
+                  <app-icon [name]="event.kind === 'birthday' ? 'birthday' : 'keepsake'" />
+                </span>
+                <span>
+                  <strong>{{ event.label }}</strong>
+                  <small>{{ dateLabel(event) }} · yearly at 6:00 AM</small>
+                </span>
+                <label>
+                  <span class="visually-hidden">Disable {{ event.label }} reminder</span>
+                  <input type="checkbox" checked (change)="disableReminder(event)" />
+                </label>
+              </div>
+            }
+          </div>
+          @if (item.events.length > 1) {
+            <button class="disable-all" type="button" (click)="disableAll(item.contact)">
+              Disable all reminders
+            </button>
+          }
+        </article>
+      }
+    </section>
+  } @else {
+    <section class="card empty-state">
+      <span class="empty-icon"><app-icon name="alert" /></span>
+      <h2>No active reminders</h2>
+      <p>Enable “Remind me” on a contact’s birthday or anniversary.</p>
+      <a class="primary-button" routerLink="/contacts">
+        <app-icon name="contacts" /> Open contacts
+      </a>
+    </section>
+  }
+</div>

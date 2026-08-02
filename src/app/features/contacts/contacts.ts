@@ -1,10 +1,11 @@
-import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   ContactEmail,
+  ContactAnniversary,
   ContactPhone,
   ContactSocial,
   PrivateContact,
@@ -12,6 +13,7 @@ import {
 import { AppStore } from '../../core/services/app-store.service';
 import { CallService } from '../../core/services/call.service';
 import { FeedbackService } from '../../core/services/feedback.service';
+import { KeepsakeReminderService } from '../../core/services/keepsake-reminder.service';
 import {
   NativeIntegrationService,
   WhatsAppPackage,
@@ -54,6 +56,7 @@ const DOB_MODES: readonly SelectPickerOption[] = [
 ];
 
 type PhoneAction = 'call' | 'whatsapp';
+type ContactFilter = 'all' | 'favourites' | 'whatsapp' | 'notes';
 
 interface PhoneChoiceSheet {
   readonly mode: PhoneAction;
@@ -74,6 +77,7 @@ export class Contacts {
   private readonly document = inject(DOCUMENT);
   private readonly native = inject(NativeIntegrationService);
   private readonly calls = inject(CallService);
+  private readonly keepsakeReminders = inject(KeepsakeReminderService);
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly editingContact = signal<PrivateContact | null>(null);
@@ -88,6 +92,8 @@ export class Contacts {
   protected readonly selectedContact = signal<PrivateContact | null>(null);
   protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
   protected readonly trashView = signal(false);
+  protected readonly contactFilter = signal<ContactFilter>('all');
+  private readonly requestedEditId = signal('');
   protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
   protected readonly selectedContacts = computed(() => {
     const ids = this.selectedIds();
@@ -100,7 +106,21 @@ export class Contacts {
   protected readonly dobModes = DOB_MODES;
 
   protected readonly filteredContacts = computed(() => {
-    const contacts = this.trashView() ? this.store.trashedContacts() : this.store.visibleContacts();
+    let contacts = this.trashView() ? this.store.trashedContacts() : this.store.visibleContacts();
+    if (!this.trashView()) {
+      contacts = contacts.filter((contact) => {
+        switch (this.contactFilter()) {
+          case 'favourites':
+            return contact.favorite;
+          case 'whatsapp':
+            return this.whatsappPhones(contact).length > 0;
+          case 'notes':
+            return contact.notes.trim().length > 0;
+          default:
+            return true;
+        }
+      });
+    }
     const query = this.search().trim().toLocaleLowerCase();
     if (!query) return contacts;
     const phoneQuery = digitsOnly(query);
@@ -118,6 +138,11 @@ export class Contacts {
     });
   });
 
+  protected setContactFilter(filter: ContactFilter): void {
+    this.contactFilter.set(filter);
+    this.clearSelection();
+  }
+
   protected readonly form = this.formBuilder.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(100)]],
     company: ['', Validators.maxLength(100)],
@@ -127,10 +152,12 @@ export class Contacts {
     phones: this.formBuilder.array([this.createPhone()]),
     emails: this.formBuilder.array([this.createEmail()]),
     socialLinks: this.formBuilder.array([this.createSocial()]),
+    anniversaries: this.formBuilder.array([this.createAnniversary()]),
     dobMode: 'none',
     dobMonth: 1,
     dobDay: 1,
     dobFull: '',
+    birthdayReminder: false,
   });
 
   constructor() {
@@ -142,6 +169,14 @@ export class Contacts {
       this.trashView.set(parameters.has('trash'));
       this.clearSelection();
       if (parameters.has('add')) this.openEditor();
+      this.requestedEditId.set(parameters.get('edit') ?? '');
+    });
+    effect(() => {
+      const id = this.requestedEditId();
+      if (!id || this.store.loading()) return;
+      const contact = this.store.activeContacts().find((entry) => entry.id === id);
+      if (contact) this.openEditor(contact);
+      this.requestedEditId.set('');
     });
   }
 
@@ -160,12 +195,17 @@ export class Contacts {
     return this.form.controls.socialLinks;
   }
 
+  protected get anniversaries() {
+    return this.form.controls.anniversaries;
+  }
+
   protected openEditor(contact?: PrivateContact): void {
     const draft = contact ? null : this.store.pendingContactDraft();
     this.editingContact.set(contact ?? null);
     this.form.controls.phones.clear();
     this.form.controls.emails.clear();
     this.form.controls.socialLinks.clear();
+    this.form.controls.anniversaries.clear();
 
     const phones = contact?.phones?.length
       ? contact.phones
@@ -189,6 +229,9 @@ export class Contacts {
     for (const social of contact?.socialLinks ?? [])
       this.socialLinks.push(this.createSocial(social));
     if (!this.socialLinks.length) this.socialLinks.push(this.createSocial());
+    for (const anniversary of (contact?.anniversaries ?? []).slice(0, 3)) {
+      this.anniversaries.push(this.createAnniversary(anniversary));
+    }
 
     const birthDate = contact?.birthDate;
     this.form.patchValue({
@@ -206,9 +249,13 @@ export class Contacts {
         birthDate?.mode === 'full' && birthDate.year
           ? `${birthDate.year}-${String(birthDate.month).padStart(2, '0')}-${String(birthDate.day).padStart(2, '0')}`
           : '',
+      birthdayReminder: birthDate?.reminderEnabled ?? false,
     });
     this.editorOpen.set(true);
-    if (draft) this.phones.at(0).controls.number.setValue(draft.phone);
+    if (draft) {
+      this.phones.at(0).controls.number.setValue(draft.phone);
+      if (draft.callingCode) this.phones.at(0).controls.callingCode.setValue(draft.callingCode);
+    }
   }
 
   protected closeEditor(): void {
@@ -238,6 +285,10 @@ export class Contacts {
     this.socialLinks.push(this.createSocial());
   }
 
+  protected addAnniversary(): void {
+    if (this.anniversaries.length < 3) this.anniversaries.push(this.createAnniversary());
+  }
+
   protected removePhone(index: number): void {
     if (this.phones.length > 1) this.phones.removeAt(index);
   }
@@ -248,6 +299,10 @@ export class Contacts {
 
   protected removeSocial(index: number): void {
     this.socialLinks.removeAt(index);
+  }
+
+  protected removeAnniversary(index: number): void {
+    this.anniversaries.removeAt(index);
   }
 
   protected setPickerValue(control: FormControl<string>, value: string): void {
@@ -266,6 +321,12 @@ export class Contacts {
     if (!usablePhones.length) {
       this.phones.at(0).controls.number.setErrors({ required: true });
       this.feedback.notify('Add at least one valid phone number');
+      this.scrollToFirstInvalidField();
+      return;
+    }
+    if (value.dobMode === 'month-day' && !this.validMonthDay(value.dobMonth, value.dobDay)) {
+      this.form.controls.dobDay.setErrors({ invalidDate: true });
+      this.feedback.notify('Enter a valid birthday month and day');
       this.scrollToFirstInvalidField();
       return;
     }
@@ -293,6 +354,27 @@ export class Contacts {
           platform: link.platform,
           url: link.url.trim(),
         }));
+      const anniversaries: readonly ContactAnniversary[] = value.anniversaries
+        .slice(0, 3)
+        .filter((anniversary) => anniversary.date)
+        .map((anniversary) => {
+          const date = new Date(`${anniversary.date}T00:00:00`);
+          return {
+            id: anniversary.id || crypto.randomUUID(),
+            name: anniversary.name.trim() || 'Anniversary',
+            month: date.getMonth() + 1,
+            day: date.getDate(),
+            year: date.getFullYear(),
+            reminderEnabled: anniversary.reminderEnabled,
+          };
+        });
+      const reminderRequested =
+        (value.dobMode !== 'none' && value.birthdayReminder) ||
+        anniversaries.some((anniversary) => anniversary.reminderEnabled);
+      if (reminderRequested && !(await this.keepsakeReminders.requestPermission())) {
+        this.feedback.notify('Allow Android notifications to enable keepsake reminders');
+        return;
+      }
       const primary = phones[0];
       const existing = this.editingContact();
       const now = new Date().toISOString();
@@ -317,10 +399,17 @@ export class Contacts {
                 year: fullDate.getFullYear(),
                 month: fullDate.getMonth() + 1,
                 day: fullDate.getDate(),
+                reminderEnabled: value.birthdayReminder,
               }
             : value.dobMode === 'month-day'
-              ? { mode: 'month-day', month: value.dobMonth, day: value.dobDay }
+              ? {
+                  mode: 'month-day',
+                  month: value.dobMonth,
+                  day: value.dobDay,
+                  reminderEnabled: value.birthdayReminder,
+                }
               : undefined,
+        anniversaries,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       };
@@ -632,6 +721,25 @@ export class Contacts {
       platform: link?.platform ?? 'LinkedIn',
       url: [link?.url ?? '', Validators.pattern(/^https?:\/\/.+/i)],
     });
+  }
+
+  private createAnniversary(anniversary?: ContactAnniversary) {
+    return this.formBuilder.nonNullable.group({
+      id: anniversary?.id ?? crypto.randomUUID(),
+      name: [anniversary?.name ?? 'Anniversary', Validators.maxLength(80)],
+      date:
+        anniversary?.year !== undefined
+          ? `${anniversary.year}-${String(anniversary.month).padStart(2, '0')}-${String(anniversary.day).padStart(2, '0')}`
+          : '',
+      reminderEnabled: anniversary?.reminderEnabled ?? false,
+    });
+  }
+
+  private validMonthDay(month: number, day: number): boolean {
+    if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1) {
+      return false;
+    }
+    return day <= new Date(2000, month, 0).getDate();
   }
 
   private scrollToFirstInvalidField(): void {

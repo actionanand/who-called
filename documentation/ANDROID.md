@@ -120,6 +120,28 @@ ENABLE_DEVICE_CALL_LOG=false npm run android:sync
 current Call Log permission policy or be distributed through an appropriate non-Play channel. The
 application remains usable when permission is denied.
 
+## Birthday and anniversary reminders
+
+Keepsake reminders use `@capacitor/local-notifications` directly, following the same native-only
+pattern as the reference CardNest application:
+
+1. Notification permission is requested only after the user enables the first birthday or
+   anniversary reminder.
+2. Each contact has stable notification IDs: one birthday reminder and up to three anniversary
+   reminders. Editing a contact cancels and recreates that contact's schedules, preventing
+   duplicates.
+3. Enabled reminders repeat yearly at 6:00 AM on the saved month and day. Each event fires only
+   once that day. Reminders saved for February 29 recur on February 28 so they remain yearly.
+4. Trashing or permanently deleting a contact cancels its reminders; restoring it recreates them.
+5. The **Alert Directory** lists every contact with an active reminder and supports disabling one
+   reminder or all of a contact's reminders without opening the editor.
+6. Android restores Capacitor local-notification schedules after a reboot. The app does not request
+   exact-alarm permission, so battery optimization may deliver a 6:00 AM reminder approximately.
+
+The reminder channel is private on the lock screen and uses the existing monochrome
+`ic_stat_who_called` notification icon. Web builds can store reminder choices for backup and later
+Android use, but do not display browser notifications.
+
 ## Security notes
 
 - `public/who-called.png` is the canonical brand input and has a transparent background.

@@ -1,0 +1,126 @@
+.alerts-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.alert-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.heading-icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border-radius: 1rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.heading-icon app-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.alert-stack {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.alert-card {
+  overflow: hidden;
+}
+
+.alert-card > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
+.avatar {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-weight: 800;
+}
+
+.alert-card h2,
+.alert-card p {
+  margin: 0;
+}
+
+.alert-card h2 {
+  font-size: 1rem;
+}
+
+.alert-card p {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.alert-card header a {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.reminder-list {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.reminder-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.reminder-icon {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.reminder-row > span:nth-child(2) {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.reminder-row small {
+  color: var(--text-muted);
+}
+
+.reminder-row input {
+  width: 1.3rem;
+  height: 1.3rem;
+  accent-color: var(--primary);
+}
+
+.disable-all {
+  width: 100%;
+  min-height: 2.8rem;
+  border: 0;
+  color: var(--danger);
+  background: transparent;
+  font-weight: 750;
+}

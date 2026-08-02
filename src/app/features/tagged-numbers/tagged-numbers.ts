@@ -91,10 +91,13 @@ export class TaggedNumbers {
     const value = this.form.getRawValue();
     const now = new Date().toISOString();
     const existing = this.editingNumber();
+    const normalizedPhone = value.phone.trimStart().startsWith('+')
+      ? `+${digitsOnly(value.phone)}`
+      : normalizePhone(this.store.settings().defaultCallingCode, value.phone);
     const taggedNumber: TaggedNumber = {
       id: existing?.id ?? crypto.randomUUID(),
       phone: digitsOnly(value.phone),
-      normalizedPhone: normalizePhone('+91', value.phone),
+      normalizedPhone,
       tag: value.tag,
       note: value.note.trim(),
       important: value.important,
