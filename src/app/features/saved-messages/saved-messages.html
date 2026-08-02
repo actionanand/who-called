@@ -31,8 +31,15 @@
               <app-icon name="trash" />
             </button>
           </header>
-          <h2>{{ message.title }}</h2>
-          <p>{{ message.message }}</p>
+          <button
+            class="message-preview"
+            type="button"
+            [attr.aria-label]="'Read full message: ' + message.title"
+            (click)="openMessage(message)"
+          >
+            <strong>{{ message.title }}</strong>
+            <span>{{ message.message }}</span>
+          </button>
           @if (message.detectedCode) {
             <button class="code-pill" type="button" (click)="copy(message.detectedCode)">
               <span
@@ -42,7 +49,12 @@
             </button>
           }
           <footer>
-            <small>{{ message.sender || 'Manual entry' }}</small>
+            <span class="message-meta">
+              <small>{{ message.sender || 'Manual entry' }}</small>
+              <time [attr.datetime]="message.createdAt">
+                Saved {{ savedAt(message.createdAt) }}
+              </time>
+            </span>
             <button class="text-link" type="button" (click)="copy(message.message)">
               Copy message
             </button>
@@ -61,6 +73,175 @@
     </section>
   }
 </div>
+
+@if (selectedMessage(); as message) {
+  <button
+    class="modal-scrim message-details-scrim"
+    type="button"
+    aria-label="Close full message"
+    (click)="closeMessage()"
+  ></button>
+  <section
+    class="message-details"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="full-message-title"
+  >
+    <header>
+      <div>
+        <span class="category">{{ message.category }}</span>
+        <h2 id="full-message-title">{{ message.title }}</h2>
+      </div>
+      <button type="button" aria-label="Close full message" (click)="closeMessage()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <div class="message-details-meta">
+      <span>{{ message.sender || 'Manual entry' }}</span>
+      <time [attr.datetime]="message.createdAt">Saved {{ savedAt(message.createdAt) }}</time>
+    </div>
+    <section class="formatting-tools" aria-label="Message formatting">
+      <div>
+        <strong>Format selection</strong>
+        <small>Select any text, then apply or remove formatting.</small>
+      </div>
+      <span class="format-buttons">
+        <button
+          type="button"
+          [class.active]="selectedFormats().highlight"
+          [disabled]="!selectedRange() || formattingSaving()"
+          [attr.aria-pressed]="selectedFormats().highlight"
+          [attr.aria-label]="
+            selectedFormats().highlight ? 'Remove highlight' : 'Highlight selection'
+          "
+          (pointerdown)="$event.preventDefault()"
+          (click)="toggleSelectedFormat('highlight')"
+        >
+          <app-icon name="highlight" /> Highlight
+        </button>
+        <button
+          type="button"
+          [class.active]="selectedFormats().bold"
+          [disabled]="!selectedRange() || formattingSaving()"
+          [attr.aria-pressed]="selectedFormats().bold"
+          [attr.aria-label]="selectedFormats().bold ? 'Remove bold' : 'Bold selection'"
+          (pointerdown)="$event.preventDefault()"
+          (click)="toggleSelectedFormat('bold')"
+        >
+          <app-icon name="bold" /> Bold
+        </button>
+      </span>
+    </section>
+    <div
+      #messageBody
+      class="message-body"
+      tabindex="0"
+      aria-label="Saved message text. Select text to format it."
+      (pointerup)="captureSelection()"
+      (keyup)="captureSelection()"
+    >
+      @for (part of displayParts(); track $index) {
+        <app-message-text-part [part]="part" (activated)="handleEntity($event)" />
+      }
+    </div>
+    @if (message.detectedCode) {
+      <div class="detected">
+        <span
+          ><small>Detected code</small><strong>{{ message.detectedCode }}</strong></span
+        >
+        <app-icon name="check" />
+      </div>
+    }
+    <div class="message-details-actions">
+      <button class="secondary-button" type="button" (click)="closeMessage()">Close</button>
+      <button class="primary-button" type="button" (click)="copy(message.message)">
+        <app-icon [name]="copied() === message.message ? 'check' : 'copy'" />
+        {{ copied() === message.message ? 'Copied' : 'Copy message' }}
+      </button>
+    </div>
+  </section>
+}
+
+@if (phoneAction(); as action) {
+  <button
+    class="modal-scrim entity-scrim"
+    type="button"
+    aria-label="Close phone number actions"
+    (click)="phoneAction.set(null)"
+  ></button>
+  <section
+    class="entity-action-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="phone-action-title"
+  >
+    <header>
+      <div>
+        <p>Phone number</p>
+        <h2 id="phone-action-title">{{ action.display }}</h2>
+      </div>
+      <button type="button" aria-label="Close phone actions" (click)="phoneAction.set(null)">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <div class="entity-action-grid">
+      <button type="button" (click)="savePhoneAsContact()">
+        <app-icon name="user-plus" /><span><strong>Save</strong><small>New contact</small></span>
+      </button>
+      <button type="button" (click)="tagPhone()">
+        <app-icon name="tag" /><span><strong>Tag</strong><small>Add a note</small></span>
+      </button>
+      <button type="button" (click)="callPhone()">
+        <app-icon name="phone" /><span><strong>Call</strong><small>Open dialler</small></span>
+      </button>
+      <button type="button" (click)="openPhoneWhatsApp()">
+        <app-icon name="message" /><span><strong>WhatsApp</strong><small>Open chat</small></span>
+      </button>
+      <button type="button" (click)="copyPhone()">
+        <app-icon name="copy" /><span><strong>Copy</strong><small>Phone number</small></span>
+      </button>
+    </div>
+  </section>
+}
+
+@if (urlAction(); as url) {
+  <button
+    class="modal-scrim entity-scrim"
+    type="button"
+    aria-label="Cancel opening link"
+    (click)="urlAction.set('')"
+  ></button>
+  <section
+    class="url-confirmation"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="url-confirm-title"
+    aria-describedby="url-confirm-message"
+  >
+    <span class="url-confirm-icon"><app-icon name="globe" /></span>
+    <div>
+      <h2 id="url-confirm-title">Open this link?</h2>
+      <p id="url-confirm-message">You are leaving Who Called? Review the address first.</p>
+      <code>{{ url }}</code>
+    </div>
+    <div class="url-confirm-actions">
+      <button class="secondary-button" type="button" (click)="urlAction.set('')">Cancel</button>
+      <button class="secondary-button" type="button" (click)="copyUrl()">
+        <app-icon name="copy" /> Copy
+      </button>
+      <button class="primary-button" type="button" (click)="navigateToUrl()">OK</button>
+    </div>
+  </section>
+}
+
+@if (whatsappChoice(); as choice) {
+  <app-whatsapp-app-chooser
+    [style.z-index]="130"
+    [packages]="choice.packages"
+    (chosen)="openWhatsAppIn($event)"
+    (closed)="whatsappChoice.set(null)"
+  />
+}
 
 @if (editorOpen()) {
   <button
@@ -82,9 +263,29 @@
     <form [formGroup]="form" (ngSubmit)="save()">
       <div class="field">
         <label for="message-title">Title</label>
-        <input id="message-title" formControlName="title" placeholder="e.g. LPG delivery OTP" />
+        <input
+          id="message-title"
+          formControlName="title"
+          placeholder="e.g. LPG delivery OTP"
+          [attr.aria-invalid]="form.controls.title.touched && form.controls.title.invalid"
+          [attr.aria-describedby]="
+            form.controls.title.touched && form.controls.title.invalid
+              ? 'message-title-error'
+              : null
+          "
+        />
+        @if (form.controls.title.touched && form.controls.title.hasError('required')) {
+          <small id="message-title-error" class="validation-error">Enter a title.</small>
+        } @else if (form.controls.title.touched && form.controls.title.hasError('maxlength')) {
+          <small id="message-title-error" class="validation-error">
+            Title cannot exceed 120 characters.
+          </small>
+        }
       </div>
-      <div class="field">
+      <div
+        class="field"
+        [class.invalid-field]="form.controls.category.touched && form.controls.category.invalid"
+      >
         <label for="message-category">Category</label>
         <app-select-picker
           [value]="form.controls.category.value"
@@ -92,6 +293,9 @@
           sheetTitle="Message category"
           (valueChange)="form.controls.category.setValue($event)"
         />
+        @if (form.controls.category.touched && form.controls.category.invalid) {
+          <small class="validation-error">Choose a category.</small>
+        }
       </div>
       <div class="field">
         <span class="label-row"
@@ -102,7 +306,20 @@
           id="message-text"
           formControlName="message"
           placeholder="Paste or type the message here"
+          [attr.aria-invalid]="form.controls.message.touched && form.controls.message.invalid"
+          [attr.aria-describedby]="
+            form.controls.message.touched && form.controls.message.invalid
+              ? 'message-text-error'
+              : null
+          "
         ></textarea>
+        @if (form.controls.message.touched && form.controls.message.hasError('required')) {
+          <small id="message-text-error" class="validation-error">Enter the message text.</small>
+        } @else if (form.controls.message.touched && form.controls.message.hasError('maxlength')) {
+          <small id="message-text-error" class="validation-error">
+            Message text cannot exceed 8,000 characters.
+          </small>
+        }
       </div>
       @if (detectedCode()) {
         <div class="detected">
@@ -114,16 +331,34 @@
       }
       <div class="field">
         <label for="message-sender">Sender <span>(optional)</span></label>
-        <input id="message-sender" formControlName="sender" placeholder="Name or phone number" />
+        <input
+          id="message-sender"
+          formControlName="sender"
+          placeholder="Name or phone number"
+          [attr.aria-invalid]="form.controls.sender.touched && form.controls.sender.invalid"
+          [attr.aria-describedby]="
+            form.controls.sender.touched && form.controls.sender.invalid
+              ? 'message-sender-error'
+              : null
+          "
+        />
+        @if (form.controls.sender.touched && form.controls.sender.hasError('maxlength')) {
+          <small id="message-sender-error" class="validation-error">
+            Sender cannot exceed 120 characters.
+          </small>
+        }
       </div>
       <label class="toggle-row">
         <span><strong>Mark as favourite</strong><small>Keep this message near the top</small></span>
         <input type="checkbox" formControlName="favorite" />
       </label>
+      @if (saveError()) {
+        <p class="save-error" role="alert"><app-icon name="alert" /> {{ saveError() }}</p>
+      }
       <div class="form-actions">
         <button class="secondary-button" type="button" (click)="closeEditor()">Cancel</button>
-        <button class="primary-button" type="submit">
-          <app-icon name="check" /> Encrypt & save
+        <button class="primary-button" type="submit" [disabled]="saving()">
+          <app-icon name="check" /> {{ saving() ? 'Saving…' : 'Encrypt & save' }}
         </button>
       </div>
     </form>

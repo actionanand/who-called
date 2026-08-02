@@ -1,0 +1,240 @@
+.keepsakes-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.keepsake-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.heading-icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border-radius: 1rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.heading-icon app-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
+.kind-tabs,
+.period-tabs {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.kind-tabs button,
+.period-tabs button,
+.calendar-toggle {
+  display: inline-flex;
+  min-height: 2.55rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 2rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  font-size: 0.76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.kind-tabs button.active,
+.period-tabs button.active,
+.calendar-toggle.active {
+  border-color: var(--primary);
+  color: #fff;
+  background: var(--primary);
+}
+
+.view-row {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.calendar-toggle {
+  justify-self: start;
+}
+
+.calendar-card {
+  padding: 0.9rem;
+}
+
+.calendar-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calendar-card h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.calendar-card header button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.weekdays {
+  margin-top: 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  text-align: center;
+}
+
+.calendar-grid {
+  margin-top: 0.4rem;
+}
+
+.calendar-grid button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 0;
+  border-radius: 0.75rem;
+  color: var(--text);
+  background: transparent;
+}
+
+.calendar-grid button.today {
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.calendar-grid button.selected {
+  color: #fff;
+  background: var(--primary);
+}
+
+.calendar-grid button small {
+  position: absolute;
+  right: 0.15rem;
+  bottom: 0.1rem;
+  display: grid;
+  width: 1rem;
+  height: 1rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--danger);
+  font-size: 0.58rem;
+}
+
+.event-stack {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.event-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+}
+
+.date-tile {
+  display: grid;
+  width: 3.2rem;
+  height: 3.2rem;
+  place-items: center;
+  align-content: center;
+  border-radius: 0.9rem;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.date-tile strong {
+  font-size: 1.2rem;
+}
+
+.date-tile small {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.event-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.event-kind app-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.event-card h2 {
+  margin: 0.15rem 0;
+  font-size: 1rem;
+}
+
+.event-card p,
+.event-card small {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.event-actions {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.event-actions a,
+.reminder-on {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.empty-day {
+  padding: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (min-width: 720px) {
+  .view-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .calendar-card {
+    max-width: 42rem;
+  }
+}

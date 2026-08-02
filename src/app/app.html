@@ -127,6 +127,14 @@
         <span class="action-icon blue"><app-icon name="tag" /></span>
         <span><strong>Tag a number</strong><small>Note an unknown caller</small></span>
       </a>
+      <a routerLink="/keepsakes" (click)="closeQuickActions()">
+        <span class="action-icon amber"><app-icon name="keepsake" /></span>
+        <span><strong>Keepsakes</strong><small>Birthdays and anniversaries</small></span>
+      </a>
+      <a routerLink="/alerts" (click)="closeQuickActions()">
+        <span class="action-icon green"><app-icon name="alert" /></span>
+        <span><strong>Alert Directory</strong><small>Manage active reminders</small></span>
+      </a>
     </div>
   </section>
 }

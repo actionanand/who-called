@@ -9,6 +9,7 @@ import {
 import { LOCAL_RECORD_REPOSITORY } from '../repositories/repository.contracts';
 import { ThemeService } from './theme.service';
 import { NativeIntegrationService } from './native-integration.service';
+import { KeepsakeReminderService } from './keepsake-reminder.service';
 
 const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -31,6 +32,7 @@ export class AppStore {
   private readonly database = inject(LOCAL_RECORD_REPOSITORY);
   private readonly themeService = inject(ThemeService);
   private readonly native = inject(NativeIntegrationService);
+  private readonly keepsakeReminders = inject(KeepsakeReminderService);
 
   readonly contacts = signal<readonly PrivateContact[]>([]);
   readonly messages = signal<readonly SavedMessage[]>([]);
@@ -41,6 +43,7 @@ export class AppStore {
   readonly pendingSharedText = signal('');
   readonly pendingContactDraft = signal<{
     readonly taggedNumberId?: string;
+    readonly callingCode?: string;
     readonly phone: string;
     readonly note: string;
     readonly tag: string;
@@ -75,6 +78,7 @@ export class AppStore {
   async addContact(contact: PrivateContact): Promise<void> {
     await this.database.put('contact', contact);
     this.contacts.update((contacts) => [contact, ...contacts]);
+    await this.keepsakeReminders.reschedule(this.contacts());
   }
 
   async updateContact(contact: PrivateContact): Promise<void> {
@@ -82,9 +86,11 @@ export class AppStore {
     this.contacts.update((contacts) =>
       contacts.map((existing) => (existing.id === contact.id ? contact : existing)),
     );
+    await this.keepsakeReminders.reschedule(this.contacts());
   }
 
   async removeContact(id: string): Promise<void> {
+    await this.keepsakeReminders.cancelForContact(id);
     await this.database.remove('contact', id);
     this.contacts.update((contacts) => contacts.filter((contact) => contact.id !== id));
   }
@@ -98,6 +104,7 @@ export class AppStore {
     this.contacts.update((contacts) =>
       contacts.map((entry) => (entry.id === id ? trashed : entry)),
     );
+    await this.keepsakeReminders.cancelForContact(id);
   }
 
   async restoreContact(id: string): Promise<void> {
@@ -112,11 +119,19 @@ export class AppStore {
     this.contacts.update((contacts) =>
       contacts.map((entry) => (entry.id === id ? restored : entry)),
     );
+    await this.keepsakeReminders.reschedule(this.contacts());
   }
 
   async addMessage(message: SavedMessage): Promise<void> {
     await this.database.put('message', message);
     this.messages.update((messages) => [message, ...messages]);
+  }
+
+  async updateMessage(message: SavedMessage): Promise<void> {
+    await this.database.put('message', message);
+    this.messages.update((messages) =>
+      messages.map((existing) => (existing.id === message.id ? message : existing)),
+    );
   }
 
   async removeMessage(id: string): Promise<void> {
@@ -172,6 +187,7 @@ export class AppStore {
     this.messages.set(snapshot.messages);
     this.taggedNumbers.set(snapshot.taggedNumbers);
     if (snapshot.settings) await this.updateSettings(snapshot.settings);
+    await this.keepsakeReminders.initialise(snapshot.contacts);
   }
 
   async unlockSensitiveData(): Promise<void> {
@@ -184,6 +200,7 @@ export class AppStore {
     this.contacts.set(contacts);
     this.messages.set(messages);
     this.taggedNumbers.set(taggedNumbers);
+    await this.keepsakeReminders.initialise(contacts);
     this.locked.set(false);
   }
 

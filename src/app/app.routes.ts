@@ -29,6 +29,18 @@ export const routes: Routes = [
     title: 'Tagged numbers · Who Called?',
   },
   {
+    path: 'keepsakes',
+    loadComponent: () =>
+      import('./features/keepsakes/keepsakes').then((module) => module.Keepsakes),
+    title: 'Keepsakes · Who Called?',
+  },
+  {
+    path: 'alerts',
+    loadComponent: () =>
+      import('./features/alert-directory/alert-directory').then((module) => module.AlertDirectory),
+    title: 'Alert directory · Who Called?',
+  },
+  {
     path: 'settings',
     loadComponent: () => import('./features/settings/settings').then((module) => module.Settings),
     title: 'Settings · Who Called?',

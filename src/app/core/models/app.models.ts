@@ -26,6 +26,16 @@ export interface ContactBirthDate {
   readonly month: number;
   readonly day: number;
   readonly year?: number;
+  readonly reminderEnabled?: boolean;
+}
+
+export interface ContactAnniversary {
+  readonly id: string;
+  readonly name: string;
+  readonly month: number;
+  readonly day: number;
+  readonly year?: number;
+  readonly reminderEnabled: boolean;
 }
 
 export interface PrivateContact {
@@ -42,6 +52,7 @@ export interface PrivateContact {
   readonly emails?: readonly ContactEmail[];
   readonly socialLinks?: readonly ContactSocial[];
   readonly birthDate?: ContactBirthDate;
+  readonly anniversaries?: readonly ContactAnniversary[];
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly deletedAt?: string;
@@ -55,7 +66,15 @@ export interface SavedMessage {
   readonly sender: string;
   readonly detectedCode: string;
   readonly favorite: boolean;
+  readonly formats?: readonly MessageTextFormat[];
   readonly createdAt: string;
+}
+
+export interface MessageTextFormat {
+  readonly start: number;
+  readonly end: number;
+  readonly bold: boolean;
+  readonly highlight: boolean;
 }
 
 export interface TaggedNumber {

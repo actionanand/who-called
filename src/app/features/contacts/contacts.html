@@ -452,12 +452,65 @@
               />
             </div>
           </div>
+          @if (form.controls.dobDay.hasError('invalidDate')) {
+            <small class="error">Enter a valid month and day.</small>
+          }
         } @else if (form.controls.dobMode.value === 'full') {
           <div class="field">
             <label for="dob-full">Full date of birth</label>
             <input id="dob-full" formControlName="dobFull" type="date" />
             <small>The current age appears below the contact preview.</small>
           </div>
+        }
+        @if (form.controls.dobMode.value !== 'none') {
+          <label class="inline-check reminder-check">
+            <input type="checkbox" formControlName="birthdayReminder" />
+            <span><app-icon name="alert" /> Remind me yearly at 6:00 AM</span>
+          </label>
+        }
+      </fieldset>
+
+      <fieldset formArrayName="anniversaries" class="repeat-group birthday-group">
+        <legend>Anniversaries <span>(optional, up to 3)</span></legend>
+        @for (
+          anniversary of anniversaries.controls;
+          track anniversary.controls.id.value;
+          let index = $index
+        ) {
+          <div class="repeat-card" [formGroupName]="index">
+            <div class="repeat-heading">
+              <strong>Anniversary {{ index + 1 }}</strong>
+              <button
+                type="button"
+                aria-label="Remove anniversary"
+                (click)="removeAnniversary(index)"
+              >
+                <app-icon name="close" />
+              </button>
+            </div>
+            <div class="field">
+              <label [for]="'anniversary-name-' + index">Name</label>
+              <input
+                [id]="'anniversary-name-' + index"
+                formControlName="name"
+                maxlength="80"
+                placeholder="Anniversary or Wedding anniversary"
+              />
+            </div>
+            <div class="field">
+              <label [for]="'anniversary-date-' + index">Date</label>
+              <input [id]="'anniversary-date-' + index" formControlName="date" type="date" />
+            </div>
+            <label class="inline-check reminder-check">
+              <input type="checkbox" formControlName="reminderEnabled" />
+              <span><app-icon name="alert" /> Remind me yearly at 6:00 AM</span>
+            </label>
+          </div>
+        }
+        @if (anniversaries.length < 3) {
+          <button class="add-field-button" type="button" (click)="addAnniversary()">
+            <app-icon name="plus" /> Add anniversary
+          </button>
         }
       </fieldset>
 
@@ -612,7 +665,30 @@
               <strong>{{ birthdayLabel(contact) }}</strong>
               <small>{{ birthdayDetail(contact) }}</small>
             </span>
+            @if (contact.birthDate.reminderEnabled) {
+              <app-icon name="alert" />
+            }
           </div>
+        </section>
+      }
+
+      @if (contact.anniversaries?.length) {
+        <section class="details-section">
+          <h3>Anniversaries</h3>
+          @for (anniversary of contact.anniversaries; track anniversary.id) {
+            <div class="detail-row">
+              <app-icon name="keepsake" />
+              <span>
+                <strong>{{ anniversary.name }}</strong>
+                <small>
+                  {{ anniversary.day }}/{{ anniversary.month }}/{{ anniversary.year }}
+                </small>
+              </span>
+              @if (anniversary.reminderEnabled) {
+                <app-icon name="alert" />
+              }
+            </div>
+          }
         </section>
       }
 
