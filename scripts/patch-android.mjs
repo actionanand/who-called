@@ -39,6 +39,7 @@ await access(javaPath).catch(() => {
 let manifest = await readFile(manifestPath, 'utf8');
 const permissions = [
   'android.permission.USE_BIOMETRIC',
+  'android.permission.USE_FINGERPRINT',
   'android.permission.CAMERA',
   'android.permission.POST_NOTIFICATIONS',
 ];
@@ -322,6 +323,7 @@ public class MainActivity extends BridgeActivity {
   private static final String BIOMETRIC_KEY_ALIAS = "who_called_biometric_key";
   private static final String SECURITY_PREFERENCES = "who_called_security";
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
+  private BiometricPrompt biometricPrompt;
   private boolean darkMode;
   private View launchOverlay;
   private long launchOverlayShownAt;
@@ -377,6 +379,16 @@ public class MainActivity extends BridgeActivity {
   public void onResume() {
     super.onResume();
     if (launchOverlay == null) applySystemBars(darkMode);
+  }
+
+  @Override
+  protected void onDestroy() {
+    if (biometricPrompt != null) {
+      biometricPrompt.cancelAuthentication();
+      biometricPrompt = null;
+    }
+    mainHandler.removeCallbacksAndMessages(null);
+    super.onDestroy();
   }
 
   @Override
@@ -693,29 +705,42 @@ public class MainActivity extends BridgeActivity {
     Runnable success,
     String action
   ) {
-    Executor executor = ContextCompat.getMainExecutor(this);
-    BiometricPrompt prompt = new BiometricPrompt(
-      this,
-      executor,
-      new BiometricPrompt.AuthenticationCallback() {
-        @Override
-        public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-          success.run();
-        }
+    if (biometricPrompt != null) {
+      dispatchNativeResult(action, false, "", "Biometric authentication is already in progress.");
+      return;
+    }
+    try {
+      Executor executor = ContextCompat.getMainExecutor(this);
+      biometricPrompt = new BiometricPrompt(
+        this,
+        executor,
+        new BiometricPrompt.AuthenticationCallback() {
+          @Override
+          public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+            super.onAuthenticationSucceeded(result);
+            biometricPrompt = null;
+            success.run();
+          }
 
-        @Override
-        public void onAuthenticationError(int code, CharSequence message) {
-          dispatchNativeResult(action, false, "", message.toString());
+          @Override
+          public void onAuthenticationError(int code, CharSequence message) {
+            super.onAuthenticationError(code, message);
+            biometricPrompt = null;
+            dispatchNativeResult(action, false, "", message.toString());
+          }
         }
-      }
-    );
-    BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-      .setTitle(title)
-      .setSubtitle("Confirm your identity on this device")
-      .setNegativeButtonText("Cancel")
-      .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-      .build();
-    prompt.authenticate(info, new BiometricPrompt.CryptoObject(cipher));
+      );
+      BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+        .setTitle(title)
+        .setSubtitle("Confirm your identity on this device")
+        .setNegativeButtonText("Cancel")
+        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        .build();
+      biometricPrompt.authenticate(info, new BiometricPrompt.CryptoObject(cipher));
+    } catch (RuntimeException error) {
+      biometricPrompt = null;
+      dispatchNativeResult(action, false, "", error.getMessage());
+    }
   }
 
   private void dispatchNativeResult(
@@ -725,6 +750,7 @@ public class MainActivity extends BridgeActivity {
     String message
   ) {
     runOnUiThread(() -> {
+      if (isFinishing() || getBridge() == null || getBridge().getWebView() == null) return;
       String script = "window.dispatchEvent(new CustomEvent('who-called-native-result',{detail:{"
         + "action:" + JSONObject.quote(action) + ","
         + "success:" + success + ","

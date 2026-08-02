@@ -200,7 +200,10 @@ export class AppStore {
     this.contacts.set(contacts);
     this.messages.set(messages);
     this.taggedNumbers.set(taggedNumbers);
-    await this.keepsakeReminders.initialise(contacts);
+    // Scheduled notifications are persisted by Capacitor and restored by Android. Rebuilding them
+    // here couples a native notification operation to PIN/biometric authentication and can keep the
+    // app locked (or terminate the native process on affected devices) after a successful login.
+    // Reminder changes and backup restores already reschedule explicitly at their mutation points.
     this.locked.set(false);
   }
 
