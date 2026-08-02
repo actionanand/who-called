@@ -130,11 +130,33 @@ const webViewKeepRules = `
     @android.webkit.JavascriptInterface <methods>;
 }
 `;
-const existingProguardRules = (await fileExists(proguardPath))
-  ? await readFile(proguardPath, 'utf8')
-  : '';
-if (!existingProguardRules.includes('@android.webkit.JavascriptInterface <methods>')) {
-  await writeFile(proguardPath, `${existingProguardRules.trimEnd()}${webViewKeepRules}`, 'utf8');
+const tinkAnnotationComment = `
+
+# Google Tink references these JSR-305 annotations as build-time metadata. Android does not ship
+# the annotation classes, and Tink does not require them at runtime.
+`;
+const tinkAnnotationRules = [
+  '-dontwarn javax.annotation.Nullable',
+  '-dontwarn javax.annotation.concurrent.GuardedBy',
+];
+let proguardRules = (await fileExists(proguardPath)) ? await readFile(proguardPath, 'utf8') : '';
+if (!proguardRules.includes('@android.webkit.JavascriptInterface <methods>')) {
+  proguardRules = `${proguardRules.trimEnd()}${webViewKeepRules}`;
+}
+if (!proguardRules.includes('# Google Tink references these JSR-305 annotations')) {
+  proguardRules = `${proguardRules.trimEnd()}${tinkAnnotationComment}`;
+}
+for (const annotationRule of tinkAnnotationRules) {
+  if (!proguardRules.includes(annotationRule)) {
+    proguardRules = `${proguardRules.trimEnd()}\n${annotationRule}\n`;
+  }
+}
+await writeFile(proguardPath, `${proguardRules.trimEnd()}\n`, 'utf8');
+
+for (const annotationRule of tinkAnnotationRules) {
+  if (!proguardRules.includes(annotationRule)) {
+    throw new Error(`Required R8 rule was not written to ${proguardPath}: ${annotationRule}`);
+  }
 }
 
 await mkdir(dirname(notificationIconPath), { recursive: true });
