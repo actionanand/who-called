@@ -1,1 +1,0 @@
-import {T,o as it,al as m_,am as J}from'./main-U4KZVLB5.js';function w(t){t||(t=T(it));let i=new J(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(m_(i))}export{w};
