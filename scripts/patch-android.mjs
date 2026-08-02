@@ -382,7 +382,7 @@ public class MainActivity extends BridgeActivity {
   }
 
   @Override
-  protected void onDestroy() {
+  public void onDestroy() {
     if (biometricPrompt != null) {
       biometricPrompt.cancelAuthentication();
       biometricPrompt = null;
