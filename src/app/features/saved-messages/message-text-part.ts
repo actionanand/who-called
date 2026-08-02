@@ -3,19 +3,8 @@ import { MessageDisplayPart } from '../../core/utils/message-formatting';
 
 @Component({
   selector: 'app-message-text-part',
-  template: `
-    @if (part().bold && part().highlight) {
-      <mark
-        ><strong>{{ part().text }}</strong></mark
-      >
-    } @else if (part().bold) {
-      <strong>{{ part().text }}</strong>
-    } @else if (part().highlight) {
-      <mark>{{ part().text }}</mark>
-    } @else {
-      {{ part().text }}
-    }
-  `,
+  template:
+    '@if (part().bold && part().highlight) {<mark><strong>{{ part().text }}</strong></mark>} @else if (part().bold) {<strong>{{ part().text }}</strong>} @else if (part().highlight) {<mark>{{ part().text }}</mark>} @else {<ng-container>{{ part().text }}</ng-container>}',
   styles: `
     :host {
       display: inline;
@@ -34,12 +23,12 @@ import { MessageDisplayPart } from '../../core/utils/message-formatting';
       outline-offset: 0.1rem;
     }
     mark {
-      padding: 0.05em 0.12em;
-      border-radius: 0.2em;
+      padding: 0;
+      border-radius: 0;
       color: var(--text);
       background: #ffe27a;
-      box-decoration-break: clone;
-      -webkit-box-decoration-break: clone;
+      box-decoration-break: slice;
+      -webkit-box-decoration-break: slice;
     }
     :host-context(:root[data-theme='dark']) mark {
       color: #fff8d8;
@@ -51,6 +40,8 @@ import { MessageDisplayPart } from '../../core/utils/message-formatting';
     '[attr.role]': "part().kind === 'text' ? null : 'link'",
     '[attr.tabindex]': "part().kind === 'text' ? null : 0",
     '[attr.aria-label]': 'ariaLabel()',
+    '[attr.data-message-start]': 'part().start',
+    '[attr.data-message-end]': 'part().end',
     '(click)': 'activate($event)',
     '(keydown.enter)': 'activate($event)',
     '(keydown.space)': 'activate($event)',

@@ -100,50 +100,35 @@
       <span>{{ message.sender || 'Manual entry' }}</span>
       <time [attr.datetime]="message.createdAt">Saved {{ savedAt(message.createdAt) }}</time>
     </div>
-    <section class="formatting-tools" aria-label="Message formatting">
-      <div>
-        <strong>Format selection</strong>
-        <small>Select any text, then apply or remove formatting.</small>
-      </div>
-      <span class="format-buttons">
-        <button
-          type="button"
-          [class.active]="selectedFormats().highlight"
-          [disabled]="!selectedRange() || formattingSaving()"
-          [attr.aria-pressed]="selectedFormats().highlight"
-          [attr.aria-label]="
-            selectedFormats().highlight ? 'Remove highlight' : 'Highlight selection'
-          "
-          (pointerdown)="$event.preventDefault()"
-          (click)="toggleSelectedFormat('highlight')"
-        >
-          <app-icon name="highlight" /> Highlight
-        </button>
-        <button
-          type="button"
-          [class.active]="selectedFormats().bold"
-          [disabled]="!selectedRange() || formattingSaving()"
-          [attr.aria-pressed]="selectedFormats().bold"
-          [attr.aria-label]="selectedFormats().bold ? 'Remove bold' : 'Bold selection'"
-          (pointerdown)="$event.preventDefault()"
-          (click)="toggleSelectedFormat('bold')"
-        >
-          <app-icon name="bold" /> Bold
-        </button>
-      </span>
-    </section>
-    <div
-      #messageBody
-      class="message-body"
-      tabindex="0"
-      aria-label="Saved message text. Select text to format it."
-      (pointerup)="captureSelection()"
-      (keyup)="captureSelection()"
-    >
-      @for (part of displayParts(); track $index) {
-        <app-message-text-part [part]="part" (activated)="handleEntity($event)" />
-      }
+    <div class="selection-toolbar" role="toolbar" aria-label="Format selected text">
+      <small>{{ selectedRange() ? 'Selection ready' : 'Select text to format' }}</small>
+      <button
+        type="button"
+        title="Highlight"
+        [class.active]="selectedFormats().highlight"
+        [disabled]="!selectedRange() || formattingSaving()"
+        [attr.aria-pressed]="selectedFormats().highlight"
+        [attr.aria-label]="selectedFormats().highlight ? 'Remove highlight' : 'Highlight selection'"
+        (pointerdown)="$event.preventDefault()"
+        (click)="toggleSelectedFormat('highlight')"
+      >
+        <app-icon name="highlight" />
+      </button>
+      <button
+        type="button"
+        title="Bold"
+        [class.active]="selectedFormats().bold"
+        [disabled]="!selectedRange() || formattingSaving()"
+        [attr.aria-pressed]="selectedFormats().bold"
+        [attr.aria-label]="selectedFormats().bold ? 'Remove bold' : 'Bold selection'"
+        (pointerdown)="$event.preventDefault()"
+        (click)="toggleSelectedFormat('bold')"
+      >
+        <app-icon name="bold" />
+      </button>
     </div>
+    <!-- prettier-ignore -->
+    <div #messageBody class="message-body" tabindex="0" aria-label="Saved message text. Select text to format it." (pointerup)="captureSelection()" (keyup)="captureSelection()"><app-message-formatted-text [parts]="displayParts()" (activated)="handleEntity($event)" /></div>
     @if (message.detectedCode) {
       <div class="detected">
         <span

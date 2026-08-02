@@ -56,6 +56,7 @@ const DOB_MODES: readonly SelectPickerOption[] = [
 ];
 
 type PhoneAction = 'call' | 'whatsapp';
+type ContactFilter = 'all' | 'favourites' | 'whatsapp' | 'notes';
 
 interface PhoneChoiceSheet {
   readonly mode: PhoneAction;
@@ -91,6 +92,7 @@ export class Contacts {
   protected readonly selectedContact = signal<PrivateContact | null>(null);
   protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
   protected readonly trashView = signal(false);
+  protected readonly contactFilter = signal<ContactFilter>('all');
   private readonly requestedEditId = signal('');
   protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
   protected readonly selectedContacts = computed(() => {
@@ -104,7 +106,21 @@ export class Contacts {
   protected readonly dobModes = DOB_MODES;
 
   protected readonly filteredContacts = computed(() => {
-    const contacts = this.trashView() ? this.store.trashedContacts() : this.store.visibleContacts();
+    let contacts = this.trashView() ? this.store.trashedContacts() : this.store.visibleContacts();
+    if (!this.trashView()) {
+      contacts = contacts.filter((contact) => {
+        switch (this.contactFilter()) {
+          case 'favourites':
+            return contact.favorite;
+          case 'whatsapp':
+            return this.whatsappPhones(contact).length > 0;
+          case 'notes':
+            return contact.notes.trim().length > 0;
+          default:
+            return true;
+        }
+      });
+    }
     const query = this.search().trim().toLocaleLowerCase();
     if (!query) return contacts;
     const phoneQuery = digitsOnly(query);
@@ -121,6 +137,11 @@ export class Contacts {
       );
     });
   });
+
+  protected setContactFilter(filter: ContactFilter): void {
+    this.contactFilter.set(filter);
+    this.clearSelection();
+  }
 
   protected readonly form = this.formBuilder.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(100)]],

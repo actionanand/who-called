@@ -82,14 +82,42 @@
       <a routerLink="/contacts"><app-icon name="chevron-left" /> Back to contacts</a>
     </div>
   } @else {
-    <div class="filter-row" aria-label="Contact filters">
-      <button class="active" type="button">All</button>
-      <button class="favourites-filter" type="button" aria-label="Favourites">
+    <div class="filter-row" role="group" aria-label="Contact filters">
+      <button
+        type="button"
+        [class.active]="contactFilter() === 'all'"
+        [attr.aria-pressed]="contactFilter() === 'all'"
+        (click)="setContactFilter('all')"
+      >
+        All
+      </button>
+      <button
+        class="favourites-filter"
+        type="button"
+        aria-label="Favourites"
+        [class.active]="contactFilter() === 'favourites'"
+        [attr.aria-pressed]="contactFilter() === 'favourites'"
+        (click)="setContactFilter('favourites')"
+      >
         <app-icon name="favorite" />
         <span>Favourites</span>
       </button>
-      <button type="button">WhatsApp</button>
-      <button type="button">Has notes</button>
+      <button
+        type="button"
+        [class.active]="contactFilter() === 'whatsapp'"
+        [attr.aria-pressed]="contactFilter() === 'whatsapp'"
+        (click)="setContactFilter('whatsapp')"
+      >
+        WhatsApp
+      </button>
+      <button
+        type="button"
+        [class.active]="contactFilter() === 'notes'"
+        [attr.aria-pressed]="contactFilter() === 'notes'"
+        (click)="setContactFilter('notes')"
+      >
+        Has notes
+      </button>
       <a
         class="trash-filter"
         routerLink="/contacts"

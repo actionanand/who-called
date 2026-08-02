@@ -33,7 +33,7 @@ import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
 import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
-import { MessageTextPart } from './message-text-part';
+import { MessageFormattedText } from './message-formatted-text';
 
 const MESSAGE_CATEGORIES: readonly SelectPickerOption[] = [
   'OTP',
@@ -53,9 +53,12 @@ const CALLING_CODES_BY_LENGTH = [
 
 @Component({
   selector: 'app-saved-messages',
-  imports: [AppIcon, MessageTextPart, ReactiveFormsModule, SelectPicker, WhatsAppAppChooser],
+  imports: [AppIcon, MessageFormattedText, ReactiveFormsModule, SelectPicker, WhatsAppAppChooser],
   templateUrl: './saved-messages.html',
   styleUrl: './saved-messages.scss',
+  host: {
+    '(document:selectionchange)': 'captureSelection()',
+  },
 })
 export class SavedMessages {
   private readonly formBuilder = inject(FormBuilder);
@@ -212,12 +215,14 @@ export class SavedMessages {
       this.selectedRange.set(null);
       return;
     }
-    const prefix = range.cloneRange();
-    prefix.selectNodeContents(container);
-    prefix.setEnd(range.startContainer, range.startOffset);
-    const start = prefix.toString().length;
-    const end = start + range.toString().length;
-    this.selectedRange.set(end > start ? { start, end } : null);
+    const start = this.messageCharacterOffset(
+      container,
+      range.startContainer,
+      range.startOffset,
+      false,
+    );
+    const end = this.messageCharacterOffset(container, range.endContainer, range.endOffset, true);
+    this.selectedRange.set(start !== null && end !== null && end > start ? { start, end } : null);
   }
 
   protected async toggleSelectedFormat(kind: MessageFormatKind): Promise<void> {
@@ -232,6 +237,7 @@ export class SavedMessages {
     try {
       await this.store.updateMessage(updated);
       this.selectedMessage.set(updated);
+      this.restoreSelection(selection);
       this.feedback.notify(
         kind === 'bold' ? 'Bold formatting saved' : 'Highlight formatting saved',
       );
@@ -334,6 +340,111 @@ export class SavedMessages {
     this.urlAction.set('');
     const destination = /^https?:\/\//iu.test(url) ? url : `https://${url}`;
     this.document.defaultView?.open(destination, '_blank', 'noopener,noreferrer');
+  }
+
+  private messageCharacterOffset(
+    container: HTMLElement,
+    node: Node,
+    offset: number,
+    endBoundary: boolean,
+  ): number | null {
+    if (node === container) {
+      const step = endBoundary ? -1 : 1;
+      let index = endBoundary ? offset - 1 : offset;
+      while (index >= 0 && index < container.childNodes.length) {
+        const host = this.partHost(container.childNodes[index]);
+        if (host) return this.partBoundary(host, endBoundary);
+        index += step;
+      }
+      return null;
+    }
+    const host = this.partHost(node);
+    if (!host || !container.contains(host)) return null;
+    const partStart = Number(host.dataset['messageStart']);
+    const partEnd = Number(host.dataset['messageEnd']);
+    const part = this.displayParts().find(
+      (candidate) => candidate.start === partStart && candidate.end === partEnd,
+    );
+    if (!part) return null;
+    const prefix = this.document.createRange();
+    prefix.selectNodeContents(host);
+    prefix.setEnd(node, offset);
+    const hostText = host.textContent ?? '';
+    const contentStart = Math.max(0, hostText.indexOf(part.text));
+    const localOffset = Math.max(
+      0,
+      Math.min(part.text.length, prefix.toString().length - contentStart),
+    );
+    return part.start + localOffset;
+  }
+
+  private partHost(node: Node): HTMLElement | null {
+    const element = node.nodeType === 1 ? (node as HTMLElement) : node.parentElement;
+    if (!element) return null;
+    return element.matches('app-message-text-part')
+      ? element
+      : element.closest<HTMLElement>('app-message-text-part');
+  }
+
+  private partBoundary(host: HTMLElement, endBoundary: boolean): number | null {
+    const value = Number(host.dataset[endBoundary ? 'messageEnd' : 'messageStart']);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private restoreSelection(selectionRange: MessageTextRange): void {
+    const restore = (): void => {
+      const container = this.messageBody()?.nativeElement;
+      const selection = container?.ownerDocument.defaultView?.getSelection();
+      if (!container || !selection) return;
+      const start = this.domPointForMessageOffset(container, selectionRange.start, false);
+      const end = this.domPointForMessageOffset(container, selectionRange.end, true);
+      if (!start || !end) return;
+      const range = this.document.createRange();
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      this.selectedRange.set(selectionRange);
+    };
+    const schedule = this.document.defaultView?.requestAnimationFrame;
+    if (schedule) schedule(() => restore());
+    else setTimeout(restore);
+  }
+
+  private domPointForMessageOffset(
+    container: HTMLElement,
+    messageOffset: number,
+    endBoundary: boolean,
+  ): { readonly node: Node; readonly offset: number } | null {
+    const hosts = [...container.querySelectorAll<HTMLElement>('app-message-text-part')];
+    const host = hosts.find((candidate) => {
+      const start = Number(candidate.dataset['messageStart']);
+      const end = Number(candidate.dataset['messageEnd']);
+      return endBoundary
+        ? messageOffset > start && messageOffset <= end
+        : messageOffset >= start && messageOffset < end;
+    });
+    if (!host) return null;
+    const partStart = Number(host.dataset['messageStart']);
+    const partEnd = Number(host.dataset['messageEnd']);
+    const part = this.displayParts().find(
+      (candidate) => candidate.start === partStart && candidate.end === partEnd,
+    );
+    if (!part) return null;
+    const hostText = host.textContent ?? '';
+    const contentStart = Math.max(0, hostText.indexOf(part.text));
+    const target =
+      contentStart + Math.max(0, Math.min(part.text.length, messageOffset - part.start));
+    const walker = this.document.createTreeWalker(host, 4);
+    let position = 0;
+    let node = walker.nextNode();
+    while (node) {
+      const length = node.textContent?.length ?? 0;
+      if (target <= position + length) return { node, offset: target - position };
+      position += length;
+      node = walker.nextNode();
+    }
+    return null;
   }
 
   protected savedAt(value: string): string {
