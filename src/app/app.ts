@@ -127,9 +127,12 @@ export class App {
     if (this.notificationPermissionBusy()) return;
     this.showNotificationPermissionPrompt.set(false);
     this.notificationPermissionBusy.set(true);
+    // Persist the user's action before Android takes over the activity for its runtime-permission
+    // UI. If an OEM recreates the WebView during that transition, the explanatory sheet must not
+    // trap the user on every subsequent launch. Permission can still be enabled from Settings.
+    this.markNotificationPromptHandled();
     const granted = await this.notifications.requestPermission(this.store.contacts());
     this.notificationPermissionBusy.set(false);
-    if (granted) this.markNotificationPromptHandled();
     this.feedback.notify(
       granted
         ? 'Notifications enabled. Keepsake reminders are scheduled.'

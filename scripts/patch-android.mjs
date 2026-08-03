@@ -23,6 +23,8 @@ const manifestPath = resolve('android/app/src/main/AndroidManifest.xml');
 const gradlePath = resolve('android/app/build.gradle');
 const proguardPath = resolve('android/app/proguard-rules.pro');
 const resPath = resolve('android/app/src/main/res');
+const backupRulesPath = resolve(resPath, 'xml/backup_rules.xml');
+const dataExtractionRulesPath = resolve(resPath, 'xml/data_extraction_rules.xml');
 const stylesPath = resolve(resPath, 'values/styles.xml');
 const nightStylesPath = resolve(resPath, 'values-night/styles.xml');
 const notificationIconPath = resolve(resPath, 'drawable/ic_stat_who_called.xml');
@@ -37,11 +39,9 @@ await access(javaPath).catch(() => {
 });
 
 let manifest = await readFile(manifestPath, 'utf8');
-const permissions = [
-  'android.permission.USE_BIOMETRIC',
-  'android.permission.USE_FINGERPRINT',
-  'android.permission.POST_NOTIFICATIONS',
-];
+const permissions = ['android.permission.USE_BIOMETRIC', 'android.permission.USE_FINGERPRINT'];
+// @capacitor/local-notifications owns POST_NOTIFICATIONS in its library manifest, matching
+// CardNest and avoiding a second app-level declaration during manifest merging.
 if (enableCallLog) permissions.push('android.permission.READ_CALL_LOG');
 
 for (const permission of permissions) {
@@ -62,6 +62,20 @@ if (!enableCallLog) {
     '',
   );
 }
+
+manifest = manifest.replace(/<application\b[^>]*>/, (application) => {
+  const backupAttributes = [
+    ['android:allowBackup', 'false'],
+    ['android:fullBackupContent', '@xml/backup_rules'],
+    ['android:dataExtractionRules', '@xml/data_extraction_rules'],
+  ];
+  return backupAttributes.reduce((patched, [name, value]) => {
+    const attribute = new RegExp(`${name}="[^"]*"`);
+    return attribute.test(patched)
+      ? patched.replace(attribute, `${name}="${value}"`)
+      : patched.replace(/>$/, `\n        ${name}="${value}">`);
+  }, application);
+});
 
 if (!manifest.includes('com.whatsapp.w4b')) {
   manifest = manifest.replace(
@@ -99,6 +113,39 @@ if (!manifest.includes('android.intent.action.SEND')) {
   );
 }
 await writeFile(manifestPath, manifest, 'utf8');
+
+const excludedBackupDomains = ['root', 'file', 'database', 'sharedpref', 'external'];
+const legacyBackupExclusions = excludedBackupDomains
+  .map((domain) => `    <exclude domain="${domain}" path="." />`)
+  .join('\n');
+const extractionExclusions = excludedBackupDomains
+  .map((domain) => `        <exclude domain="${domain}" path="." />`)
+  .join('\n');
+
+await mkdir(dirname(backupRulesPath), { recursive: true });
+await writeFile(
+  backupRulesPath,
+  `<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+${legacyBackupExclusions}
+</full-backup-content>
+`,
+  'utf8',
+);
+await writeFile(
+  dataExtractionRulesPath,
+  `<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+${extractionExclusions}
+    </cloud-backup>
+    <device-transfer>
+${extractionExclusions}
+    </device-transfer>
+</data-extraction-rules>
+`,
+  'utf8',
+);
 
 let gradle = await readFile(gradlePath, 'utf8');
 gradle = gradle
@@ -386,16 +433,6 @@ public class MainActivity extends BridgeActivity {
   public void onResume() {
     super.onResume();
     if (launchOverlay == null) applySystemBars(darkMode);
-  }
-
-  @Override
-  public void onDestroy() {
-    if (biometricPrompt != null) {
-      biometricPrompt.cancelAuthentication();
-      biometricPrompt = null;
-    }
-    mainHandler.removeCallbacksAndMessages(null);
-    super.onDestroy();
   }
 
   @Override
@@ -903,5 +940,5 @@ public class MainActivity extends BridgeActivity {
 
 await writeFile(javaPath, source, 'utf8');
 console.log(
-  `Applied Who Called Android splash, share-target, system-bar and notification-icon patches. Call log: ${enableCallLog ? 'enabled' : 'disabled'}.`,
+  `Applied Who Called Android splash, share-target, system-bar, notification-icon and private-backup patches. Call log: ${enableCallLog ? 'enabled' : 'disabled'}.`,
 );
