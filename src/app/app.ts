@@ -1,13 +1,26 @@
-import { NgOptimizedImage } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { DOCUMENT, NgOptimizedImage } from '@angular/common';
+import {
+  afterNextRender,
+  Component,
+  effect,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AppIcon } from './shared/components/app-icon';
 import { AppFeedback } from './shared/components/app-feedback';
+import { PrivateContact } from './core/models/app.models';
 import { AppStore } from './core/services/app-store.service';
 import { CallService } from './core/services/call.service';
+import { FeedbackService } from './core/services/feedback.service';
+import { KeepsakeReminderService } from './core/services/keepsake-reminder.service';
 import { NativeIntegrationService } from './core/services/native-integration.service';
 import { SecurityService } from './core/services/security.service';
+
+const NOTIFICATION_START_DELAY_MS = 1_000;
 
 @Component({
   selector: 'app-root',
@@ -24,19 +37,44 @@ import { SecurityService } from './core/services/security.service';
   styleUrl: './app.scss',
   host: {
     '[class.sheet-open]': 'store.quickActionsOpen()',
+    '(document:keydown.escape)': 'dismissNotificationPermissionPrompt()',
+    '(document:visibilitychange)': 'refreshNotificationPermission()',
   },
 })
 export class App {
   protected readonly store = inject(AppStore);
   private readonly native = inject(NativeIntegrationService);
   private readonly calls = inject(CallService);
+  private readonly feedback = inject(FeedbackService);
+  private readonly notifications = inject(KeepsakeReminderService);
+  private readonly document = inject(DOCUMENT);
   private readonly router = inject(Router);
   private readonly security = inject(SecurityService);
   protected readonly unlockPin = signal('');
   protected readonly unlockError = signal('');
   protected readonly biometricBusy = signal(false);
+  protected readonly showNotificationPermissionPrompt = signal(false);
+  protected readonly notificationPermissionBusy = signal(false);
+  private readonly viewReady = signal(false);
+  private readonly mainContent = viewChild<ElementRef<HTMLElement>>('mainContent');
+  private readonly allowNotificationsButton = viewChild<ElementRef<HTMLButtonElement>>(
+    'allowNotificationsButton',
+  );
+  private notificationInitialisationStarted = false;
 
   constructor() {
+    afterNextRender(() => this.viewReady.set(true));
+    effect(() => {
+      const ready = this.viewReady() && !this.store.loading() && !this.store.locked();
+      const contacts = this.store.contacts();
+      if (!ready || this.notificationInitialisationStarted) return;
+      this.notificationInitialisationStarted = true;
+      globalThis.setTimeout(
+        () => void this.prepareNotifications(contacts),
+        NOTIFICATION_START_DELAY_MS,
+      );
+    });
+
     const sharedText = this.native.consumeSharedText();
     if (sharedText) {
       this.store.pendingSharedText.set(sharedText);
@@ -81,5 +119,52 @@ export class App {
     } finally {
       this.biometricBusy.set(false);
     }
+  }
+
+  protected dismissNotificationPermissionPrompt(): void {
+    if (this.notificationPermissionBusy() || !this.showNotificationPermissionPrompt()) return;
+    this.showNotificationPermissionPrompt.set(false);
+    queueMicrotask(() => this.mainContent()?.nativeElement.focus());
+  }
+
+  protected async allowNotifications(): Promise<void> {
+    if (this.notificationPermissionBusy()) return;
+    this.showNotificationPermissionPrompt.set(false);
+    this.notificationPermissionBusy.set(true);
+    const granted = await this.notifications.requestPermission(this.store.contacts());
+    this.notificationPermissionBusy.set(false);
+    this.feedback.notify(
+      granted
+        ? 'Notifications enabled. Keepsake reminders are scheduled.'
+        : 'Notifications were not enabled. You can allow them later in Android settings.',
+    );
+    queueMicrotask(() => this.mainContent()?.nativeElement.focus());
+  }
+
+  protected refreshNotificationPermission(): void {
+    if (
+      this.document.visibilityState !== 'visible' ||
+      this.store.loading() ||
+      this.store.locked() ||
+      this.notificationPermissionBusy() ||
+      this.notifications.permission() === 'granted'
+    ) {
+      return;
+    }
+    void this.refreshNotificationsAfterSettings();
+  }
+
+  private async prepareNotifications(contacts: readonly PrivateContact[]): Promise<void> {
+    await this.notifications.initialise(contacts);
+    if (!(await this.notifications.shouldRequestNotificationPermission())) return;
+    this.showNotificationPermissionPrompt.set(true);
+    queueMicrotask(() => this.allowNotificationsButton()?.nativeElement.focus());
+  }
+
+  private async refreshNotificationsAfterSettings(): Promise<void> {
+    await this.notifications.initialise(this.store.contacts());
+    if (this.notifications.permission() !== 'granted') return;
+    this.showNotificationPermissionPrompt.set(false);
+    this.feedback.notify('Notifications enabled. Keepsake reminders are scheduled.');
   }
 }

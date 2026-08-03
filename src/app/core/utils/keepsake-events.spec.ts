@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PrivateContact } from '../models/app.models';
-import { dateForYear, keepsakeEvents } from './keepsake-events';
+import { dateForYear, keepsakeEvents, keepsakeNotificationDate } from './keepsake-events';
 
 function contact(overrides: Partial<PrivateContact> = {}): PrivateContact {
   return {
@@ -67,5 +67,23 @@ describe('keepsakeEvents', () => {
   it('clamps leap-day keepsakes to the last valid day of February', () => {
     expect(dateForYear(2027, 2, 29).getDate()).toBe(28);
     expect(dateForYear(2028, 2, 29).getDate()).toBe(29);
+  });
+
+  it('keeps a future 6:00 AM reminder at its intended time', () => {
+    const scheduled = keepsakeNotificationDate(
+      new Date(2026, 7, 3, 6, 0),
+      new Date(2026, 7, 3, 5, 45),
+    );
+
+    expect(scheduled).toEqual(new Date(2026, 7, 3, 6, 0));
+  });
+
+  it('catches up one minute later when permission is granted after 6:00 AM', () => {
+    const scheduled = keepsakeNotificationDate(
+      new Date(2026, 7, 3, 6, 0),
+      new Date(2026, 7, 3, 6, 2),
+    );
+
+    expect(scheduled).toEqual(new Date(2026, 7, 3, 6, 3));
   });
 });

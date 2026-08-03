@@ -40,7 +40,6 @@ let manifest = await readFile(manifestPath, 'utf8');
 const permissions = [
   'android.permission.USE_BIOMETRIC',
   'android.permission.USE_FINGERPRINT',
-  'android.permission.CAMERA',
   'android.permission.POST_NOTIFICATIONS',
 ];
 if (enableCallLog) permissions.push('android.permission.READ_CALL_LOG');
@@ -53,6 +52,10 @@ for (const permission of permissions) {
     );
   }
 }
+manifest = manifest.replace(
+  /\s*<uses-permission android:name="android\.permission\.CAMERA"\s*\/>/g,
+  '',
+);
 if (!enableCallLog) {
   manifest = manifest.replace(
     /\s*<uses-permission android:name="android\.permission\.READ_CALL_LOG"\s*\/>/g,

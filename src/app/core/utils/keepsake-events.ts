@@ -16,6 +16,7 @@ export interface KeepsakeEvent {
 }
 
 const DAY_MS = 86_400_000;
+const CATCH_UP_DELAY_MS = 60_000;
 
 export function keepsakeEvents(
   contacts: readonly PrivateContact[],
@@ -62,6 +63,17 @@ export function keepsakeEvents(
 export function dateForYear(year: number, month: number, day: number): Date {
   const lastDay = new Date(year, month, 0).getDate();
   return new Date(year, month - 1, Math.min(day, lastDay), 6, 0, 0, 0);
+}
+
+export function keepsakeNotificationDate(nextDate: Date, now = new Date()): Date {
+  const scheduled = new Date(nextDate);
+  const isToday =
+    scheduled.getFullYear() === now.getFullYear() &&
+    scheduled.getMonth() === now.getMonth() &&
+    scheduled.getDate() === now.getDate();
+  return isToday && scheduled.getTime() <= now.getTime()
+    ? new Date(now.getTime() + CATCH_UP_DELAY_MS)
+    : scheduled;
 }
 
 function createEvent(
