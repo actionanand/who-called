@@ -1,4 +1,8 @@
-<div class="app-frame">
+<div
+  class="app-frame"
+  [attr.aria-hidden]="showNotificationPermissionPrompt() ? 'true' : null"
+  [attr.inert]="showNotificationPermissionPrompt() ? '' : null"
+>
   <header class="topbar">
     <a class="brand" routerLink="/home" aria-label="Who Called home">
       <img ngSrc="who-called.png" width="40" height="40" priority alt="" />
@@ -12,7 +16,7 @@
     </button>
   </header>
 
-  <main id="main-content" tabindex="-1">
+  <main #mainContent id="main-content" tabindex="-1">
     <router-outlet />
   </main>
 
@@ -42,6 +46,45 @@
   </button>
 </div>
 <app-feedback />
+
+@if (showNotificationPermissionPrompt()) {
+  <div class="permission-backdrop">
+    <section
+      class="permission-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notification-permission-title"
+      aria-describedby="notification-permission-description"
+      [attr.aria-busy]="notificationPermissionBusy()"
+    >
+      <span class="permission-dialog__icon" aria-hidden="true"><app-icon name="alert" /></span>
+      <h2 id="notification-permission-title">Allow keepsake reminders?</h2>
+      <p id="notification-permission-description">
+        Who Called? can privately remind you about birthdays and anniversaries at 6:00 AM. These
+        local notifications stay on this device.
+      </p>
+      <div class="permission-dialog__actions">
+        <button
+          class="secondary-button"
+          type="button"
+          [disabled]="notificationPermissionBusy()"
+          (click)="dismissNotificationPermissionPrompt()"
+        >
+          Not now
+        </button>
+        <button
+          #allowNotificationsButton
+          class="primary-button"
+          type="button"
+          [disabled]="notificationPermissionBusy()"
+          (click)="allowNotifications()"
+        >
+          {{ notificationPermissionBusy() ? 'Waiting for Android…' : 'Allow notifications' }}
+        </button>
+      </div>
+    </section>
+  </div>
+}
 
 @if (store.locked()) {
   <section class="lock-screen" role="dialog" aria-modal="true" aria-labelledby="unlock-title">

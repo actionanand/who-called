@@ -173,6 +173,7 @@ export class AppStore {
     readonly taggedNumbers: readonly TaggedNumber[];
     readonly settings?: Partial<AppSettings>;
   }): Promise<void> {
+    const previousContacts = this.contacts();
     await Promise.all([
       this.database.clear('contact'),
       this.database.clear('message'),
@@ -187,7 +188,7 @@ export class AppStore {
     this.messages.set(snapshot.messages);
     this.taggedNumbers.set(snapshot.taggedNumbers);
     if (snapshot.settings) await this.updateSettings(snapshot.settings);
-    await this.keepsakeReminders.initialise(snapshot.contacts);
+    await this.keepsakeReminders.rebuildAfterRestore(previousContacts, snapshot.contacts);
   }
 
   async unlockSensitiveData(): Promise<void> {
