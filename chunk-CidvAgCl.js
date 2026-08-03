@@ -1,0 +1,1 @@
+import {S,H as He,al as C_,am as Y}from'./main-CVPWIHJP.js';function w(t){t||(t=S(He));let i=new Y(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(C_(i))}export{w};
