@@ -39,9 +39,11 @@ await access(javaPath).catch(() => {
 });
 
 let manifest = await readFile(manifestPath, 'utf8');
-const permissions = ['android.permission.USE_BIOMETRIC', 'android.permission.USE_FINGERPRINT'];
-// @capacitor/local-notifications owns POST_NOTIFICATIONS in its library manifest, matching
-// CardNest and avoiding a second app-level declaration during manifest merging.
+const permissions = [
+  'android.permission.USE_BIOMETRIC',
+  'android.permission.USE_FINGERPRINT',
+  'android.permission.POST_NOTIFICATIONS',
+];
 if (enableCallLog) permissions.push('android.permission.READ_CALL_LOG');
 
 for (const permission of permissions) {
@@ -327,6 +329,9 @@ await ensureThemes(nightStylesPath, true);
 const source = `package ${appId};
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -374,6 +379,8 @@ import javax.crypto.spec.GCMParameterSpec;
 public class MainActivity extends BridgeActivity {
   private static final boolean DEVICE_CALL_LOG_ENABLED = ${enableCallLog};
   private static final int CALL_LOG_PERMISSION_REQUEST = 4801;
+  private static final int NOTIFICATION_PERMISSION_REQUEST = 4802;
+  private static final String KEEPSAKE_NOTIFICATION_CHANNEL = "who-called-keepsakes";
   private static final String BIOMETRIC_KEY_ALIAS = "who_called_biometric_key";
   private static final String SECURITY_PREFERENCES = "who_called_security";
   private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -412,21 +419,35 @@ public class MainActivity extends BridgeActivity {
     String[] permissions,
     int[] grantResults
   ) {
-    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-    if (requestCode != CALL_LOG_PERMISSION_REQUEST) return;
-    if (
-      grantResults.length > 0
-        && grantResults[0] == PackageManager.PERMISSION_GRANTED
-    ) {
-      dispatchDeviceCallHistory();
-    } else {
+    if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+      boolean granted =
+        grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+      if (granted) ensureKeepsakeNotificationChannel();
       dispatchNativeResult(
-        "call-history",
-        false,
-        "",
-        "Phone call history permission was not granted."
+        "notification-permission",
+        true,
+        granted ? "granted" : "denied",
+        ""
       );
+      return;
     }
+    if (requestCode == CALL_LOG_PERMISSION_REQUEST) {
+      if (
+        grantResults.length > 0
+          && grantResults[0] == PackageManager.PERMISSION_GRANTED
+      ) {
+        dispatchDeviceCallHistory();
+      } else {
+        dispatchNativeResult(
+          "call-history",
+          false,
+          "",
+          "Phone call history permission was not granted."
+        );
+      }
+      return;
+    }
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
   }
 
   @Override
@@ -680,6 +701,63 @@ public class MainActivity extends BridgeActivity {
         }
       } catch (Exception ignored) { }
     }
+
+    @JavascriptInterface
+    public boolean notificationPermissionGranted() {
+      return hasNotificationPermission();
+    }
+
+    @JavascriptInterface
+    public void requestNotificationPermission() {
+      runOnUiThread(() -> {
+        try {
+          if (hasNotificationPermission()) {
+            MainActivity.this.ensureKeepsakeNotificationChannel();
+            dispatchNativeResult("notification-permission", true, "granted", "");
+            return;
+          }
+          requestPermissions(
+            new String[] { Manifest.permission.POST_NOTIFICATIONS },
+            NOTIFICATION_PERMISSION_REQUEST
+          );
+        } catch (Exception error) {
+          dispatchNativeResult(
+            "notification-permission",
+            false,
+            "",
+            error.getMessage() == null ? "Notification permission could not be requested." : error.getMessage()
+          );
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void ensureKeepsakeNotificationChannel() {
+      MainActivity.this.ensureKeepsakeNotificationChannel();
+    }
+  }
+
+  private boolean hasNotificationPermission() {
+    return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+      || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+        == PackageManager.PERMISSION_GRANTED;
+  }
+
+  private void ensureKeepsakeNotificationChannel() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+    NotificationManager manager = getSystemService(NotificationManager.class);
+    if (manager == null) return;
+    NotificationChannel channel = new NotificationChannel(
+      KEEPSAKE_NOTIFICATION_CHANNEL,
+      "Birthdays and anniversaries",
+      NotificationManager.IMPORTANCE_HIGH
+    );
+    channel.setDescription("Birthday and anniversary reminders at 6:00 AM");
+    channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+    channel.enableLights(true);
+    channel.setLightColor(Color.parseColor("#087647"));
+    channel.enableVibration(true);
+    manager.createNotificationChannel(channel);
   }
 
   private void showLaunchOverlay() {

@@ -129,7 +129,11 @@ pattern as the reference CardNest application:
    notifications. Android's system permission prompt opens only after the user chooses **Allow
    notifications**. That choice is recorded before Android takes over the activity, so an OEM WebView
    recreation cannot trap the user on the same explanation after reopening. Notification permission
-   can still be enabled later from Settings.
+   can still be enabled later from Settings. Permission and notification-channel setup run through
+   the app's native `WhoCalledNative` bridge rather than Capacitor's permission callback. This uses
+   the same activity-owned permission flow as device call history and avoids plugin lifecycle failure
+   during the permission transition. Capacitor remains responsible only for storing and delivering
+   scheduled alarms.
 2. Each contact has stable notification IDs: one birthday reminder and up to three anniversary
    reminders. Editing a contact cancels and recreates that contact's schedules, preventing
    duplicates.

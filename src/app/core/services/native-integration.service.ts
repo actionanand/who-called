@@ -19,6 +19,9 @@ interface WhoCalledNativeBridge {
   enableBiometric(secret: string): void;
   authenticateBiometric(): void;
   disableBiometric(): void;
+  notificationPermissionGranted(): boolean;
+  requestNotificationPermission(): void;
+  ensureKeepsakeNotificationChannel(): void;
 }
 
 interface NativeWindow extends Window {
@@ -121,6 +124,24 @@ export class NativeIntegrationService {
     this.bridge()?.disableBiometric();
   }
 
+  notificationPermissionGranted(): boolean {
+    return this.bridge()?.notificationPermissionGranted() ?? false;
+  }
+
+  requestNotificationPermission(): Promise<boolean> {
+    const bridge = this.bridge();
+    if (!bridge) {
+      return Promise.reject(new Error('Notifications are available only on Android.'));
+    }
+    return this.waitForNativeResult('notification-permission', () =>
+      bridge.requestNotificationPermission(),
+    ).then((value) => value === 'granted');
+  }
+
+  ensureKeepsakeNotificationChannel(): void {
+    this.bridge()?.ensureKeepsakeNotificationChannel();
+  }
+
   private bridge(): WhoCalledNativeBridge | undefined {
     return (this.document.defaultView as NativeWindow | null)?.WhoCalledNative;
   }
@@ -154,7 +175,7 @@ export class NativeIntegrationService {
       };
       nativeWindow.addEventListener('who-called-native-result', handleResult);
       timeout = globalThis.setTimeout(
-        () => finish(false, '', 'Biometric authentication timed out.'),
+        () => finish(false, '', 'The Android request timed out.'),
         60_000,
       );
       try {
@@ -163,7 +184,7 @@ export class NativeIntegrationService {
         finish(
           false,
           '',
-          error instanceof Error ? error.message : 'Biometric authentication failed.',
+          error instanceof Error ? error.message : 'The Android request could not be started.',
         );
       }
     });
