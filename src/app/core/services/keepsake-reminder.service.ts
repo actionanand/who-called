@@ -3,54 +3,13 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { PrivateContact } from '../models/app.models';
 import { contactDisplayName } from '../utils/contact-privacy';
-import {
-  dateForYear,
-  KeepsakeEvent,
-  keepsakeEvents,
-  keepsakeNotificationDate,
-} from '../utils/keepsake-events';
+import { KeepsakeEvent, keepsakeEvents, keepsakeNotificationDate } from '../utils/keepsake-events';
 
 @Service()
 export class KeepsakeReminderService {
   private readonly channelId = 'who-called-keepsakes';
   readonly permission = signal<'unavailable' | 'prompt' | 'denied' | 'granted'>('unavailable');
   readonly lastError = signal('');
-
-  async initialise(contacts: readonly PrivateContact[]): Promise<void> {
-    if (!this.isAndroid()) return;
-    try {
-      const previousPermission = this.permission();
-      await this.ensureChannel();
-      const status = await LocalNotifications.checkPermissions();
-      this.permission.set(
-        status.display === 'granted'
-          ? 'granted'
-          : status.display === 'denied'
-            ? 'denied'
-            : 'prompt',
-      );
-      if (status.display === 'granted') {
-        await this.reschedule(
-          contacts,
-          previousPermission === 'prompt' || previousPermission === 'denied',
-          true,
-        );
-      }
-    } catch {
-      this.lastError.set('Keepsake reminders could not be initialised.');
-    }
-  }
-
-  async shouldRequestNotificationPermission(): Promise<boolean> {
-    if (!this.isAndroid()) return false;
-    try {
-      const status = await LocalNotifications.checkPermissions();
-      return status.display !== 'granted';
-    } catch {
-      this.lastError.set('Android notification permission could not be checked.');
-      return false;
-    }
-  }
 
   async requestPermission(contacts: readonly PrivateContact[] = []): Promise<boolean> {
     if (!this.isAndroid()) return true;
@@ -73,11 +32,7 @@ export class KeepsakeReminderService {
     }
   }
 
-  async reschedule(
-    contacts: readonly PrivateContact[],
-    catchUpMissedToday = false,
-    preserveDuePending = false,
-  ): Promise<void> {
+  async reschedule(contacts: readonly PrivateContact[], catchUpMissedToday = false): Promise<void> {
     if (!this.isAndroid()) return;
     try {
       const status = await LocalNotifications.checkPermissions();
@@ -94,19 +49,12 @@ export class KeepsakeReminderService {
       )
         .filter((event) => event.reminderEnabled)
         .map((event) => ({ event, id: this.notificationIdForEvent(event) }));
-      const preservedIds = preserveDuePending
-        ? await this.pendingIdsForDueEvents(events, now)
-        : new Set<number>();
-      const ids = contacts
-        .flatMap((contact) => this.notificationIds(contact.id))
-        .filter((id) => !preservedIds.has(id));
+      const ids = contacts.flatMap((contact) => this.notificationIds(contact.id));
       if (ids.length) {
         await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) });
       }
-      const notifications = events
-        .filter(({ id }) => !preservedIds.has(id))
-        .map(({ event, id }) => ({
-          id,
+      const notifications = events.flatMap(({ event, id }) => {
+        const shared = {
           title: event.kind === 'birthday' ? 'Birthday today' : `${event.label} today`,
           body:
             event.kind === 'birthday'
@@ -115,17 +63,37 @@ export class KeepsakeReminderService {
           channelId: this.channelId,
           smallIcon: 'ic_stat_who_called',
           autoCancel: true,
+          extra: { source: 'who-called', contactId: event.contact.id, kind: event.kind },
+        };
+        const recurring = {
+          ...shared,
+          id,
           schedule: {
-            at:
-              catchUpMissedToday && event.nextDate.getTime() <= now.getTime()
-                ? keepsakeNotificationDate(event.nextDate, now)
-                : event.nextDate.getTime() <= now.getTime()
-                  ? dateForYear(now.getFullYear() + 1, event.month, event.day)
-                  : event.nextDate,
+            on: {
+              month: event.month,
+              day: event.month === 2 && event.day === 29 ? 28 : event.day,
+              hour: 6,
+              minute: 0,
+            },
+            repeats: true,
             allowWhileIdle: true,
           },
-          extra: { source: 'who-called', contactId: event.contact.id, kind: event.kind },
-        }));
+        };
+        if (!catchUpMissedToday || event.nextDate.getTime() > now.getTime()) {
+          return [recurring];
+        }
+        return [
+          recurring,
+          {
+            ...shared,
+            id: this.catchUpNotificationId(id),
+            schedule: {
+              at: keepsakeNotificationDate(event.nextDate, now),
+              allowWhileIdle: true,
+            },
+          },
+        ];
+      });
       if (notifications.length) await LocalNotifications.schedule({ notifications });
       this.lastError.set('');
     } catch {
@@ -164,7 +132,10 @@ export class KeepsakeReminderService {
   }
 
   private notificationIds(contactId: string): readonly number[] {
-    return Array.from({ length: 4 }, (_, index) => this.notificationId(contactId, index));
+    const recurringIds = Array.from({ length: 4 }, (_, index) =>
+      this.notificationId(contactId, index),
+    );
+    return [...recurringIds, ...recurringIds.map((id) => this.catchUpNotificationId(id))];
   }
 
   private notificationIdForEvent(event: KeepsakeEvent): number {
@@ -179,22 +150,6 @@ export class KeepsakeReminderService {
             ),
           );
     return this.notificationId(event.contact.id, offset);
-  }
-
-  private async pendingIdsForDueEvents(
-    events: readonly { readonly event: KeepsakeEvent; readonly id: number }[],
-    now: Date,
-  ): Promise<ReadonlySet<number>> {
-    const dueIds = new Set(
-      events.filter(({ event }) => event.nextDate.getTime() <= now.getTime()).map(({ id }) => id),
-    );
-    if (!dueIds.size) return new Set<number>();
-    try {
-      const pending = await LocalNotifications.getPending();
-      return new Set(pending.notifications.map(({ id }) => id).filter((id) => dueIds.has(id)));
-    } catch {
-      return new Set<number>();
-    }
   }
 
   private async pendingKeepsakeNotificationIds(): Promise<readonly number[]> {
@@ -217,6 +172,10 @@ export class KeepsakeReminderService {
     let hash = 0;
     for (const character of contactId) hash = (Math.imul(hash, 31) + character.charCodeAt(0)) | 0;
     return 100_000_000 + (Math.abs(hash) % 400_000_000) * 4 + offset;
+  }
+
+  private catchUpNotificationId(recurringId: number): number {
+    return -recurringId;
   }
 
   private async ensureChannel(): Promise<void> {
