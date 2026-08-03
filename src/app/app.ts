@@ -12,7 +12,6 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AppIcon } from './shared/components/app-icon';
 import { AppFeedback } from './shared/components/app-feedback';
-import { PrivateContact } from './core/models/app.models';
 import { AppStore } from './core/services/app-store.service';
 import { CallService } from './core/services/call.service';
 import { FeedbackService } from './core/services/feedback.service';
@@ -20,7 +19,7 @@ import { KeepsakeReminderService } from './core/services/keepsake-reminder.servi
 import { NativeIntegrationService } from './core/services/native-integration.service';
 import { SecurityService } from './core/services/security.service';
 
-const NOTIFICATION_START_DELAY_MS = 1_000;
+const NOTIFICATION_PROMPT_KEY = 'who-called.notification-schedule-v2';
 
 @Component({
   selector: 'app-root',
@@ -38,7 +37,6 @@ const NOTIFICATION_START_DELAY_MS = 1_000;
   host: {
     '[class.sheet-open]': 'store.quickActionsOpen()',
     '(document:keydown.escape)': 'dismissNotificationPermissionPrompt()',
-    '(document:visibilitychange)': 'refreshNotificationPermission()',
   },
 })
 export class App {
@@ -60,19 +58,17 @@ export class App {
   private readonly allowNotificationsButton = viewChild<ElementRef<HTMLButtonElement>>(
     'allowNotificationsButton',
   );
-  private notificationInitialisationStarted = false;
+  private notificationPromptInitialised = false;
 
   constructor() {
     afterNextRender(() => this.viewReady.set(true));
     effect(() => {
       const ready = this.viewReady() && !this.store.loading() && !this.store.locked();
-      const contacts = this.store.contacts();
-      if (!ready || this.notificationInitialisationStarted) return;
-      this.notificationInitialisationStarted = true;
-      globalThis.setTimeout(
-        () => void this.prepareNotifications(contacts),
-        NOTIFICATION_START_DELAY_MS,
-      );
+      if (!ready || this.notificationPromptInitialised) return;
+      this.notificationPromptInitialised = true;
+      if (!this.shouldShowNotificationPermissionPrompt()) return;
+      this.showNotificationPermissionPrompt.set(true);
+      queueMicrotask(() => this.allowNotificationsButton()?.nativeElement.focus());
     });
 
     const sharedText = this.native.consumeSharedText();
@@ -133,6 +129,7 @@ export class App {
     this.notificationPermissionBusy.set(true);
     const granted = await this.notifications.requestPermission(this.store.contacts());
     this.notificationPermissionBusy.set(false);
+    if (granted) this.markNotificationPromptHandled();
     this.feedback.notify(
       granted
         ? 'Notifications enabled. Keepsake reminders are scheduled.'
@@ -141,30 +138,20 @@ export class App {
     queueMicrotask(() => this.mainContent()?.nativeElement.focus());
   }
 
-  protected refreshNotificationPermission(): void {
-    if (
-      this.document.visibilityState !== 'visible' ||
-      this.store.loading() ||
-      this.store.locked() ||
-      this.notificationPermissionBusy() ||
-      this.notifications.permission() === 'granted'
-    ) {
-      return;
+  private shouldShowNotificationPermissionPrompt(): boolean {
+    if (!this.native.isAndroid()) return false;
+    try {
+      return this.document.defaultView?.localStorage.getItem(NOTIFICATION_PROMPT_KEY) !== 'handled';
+    } catch {
+      return true;
     }
-    void this.refreshNotificationsAfterSettings();
   }
 
-  private async prepareNotifications(contacts: readonly PrivateContact[]): Promise<void> {
-    await this.notifications.initialise(contacts);
-    if (!(await this.notifications.shouldRequestNotificationPermission())) return;
-    this.showNotificationPermissionPrompt.set(true);
-    queueMicrotask(() => this.allowNotificationsButton()?.nativeElement.focus());
-  }
-
-  private async refreshNotificationsAfterSettings(): Promise<void> {
-    await this.notifications.initialise(this.store.contacts());
-    if (this.notifications.permission() !== 'granted') return;
-    this.showNotificationPermissionPrompt.set(false);
-    this.feedback.notify('Notifications enabled. Keepsake reminders are scheduled.');
+  private markNotificationPromptHandled(): void {
+    try {
+      this.document.defaultView?.localStorage.setItem(NOTIFICATION_PROMPT_KEY, 'handled');
+    } catch {
+      // The permission action still works when WebView storage is unavailable.
+    }
   }
 }

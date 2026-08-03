@@ -127,24 +127,26 @@ pattern as the reference CardNest application:
 
 1. After the first unlocked render, an in-app explanation asks the user whether to enable local
    notifications. Android's system permission prompt opens only after the user chooses **Allow
-   notifications**. Enabling a reminder later also requests permission if it is still unavailable.
+   notifications**. If setup is postponed or denied, the in-app explanation returns on a later app
+   launch. It is marked complete only after permission is granted and current reminders are
+   scheduled. Enabling a reminder later also requests permission if it is still unavailable.
 2. Each contact has stable notification IDs: one birthday reminder and up to three anniversary
    reminders. Editing a contact cancels and recreates that contact's schedules, preventing
    duplicates.
-3. The app schedules one concrete next occurrence per enabled reminder at 6:00 AM, following the
-   CardNest scheduling model. The schedule is refreshed after each unlocked app launch and whenever
-   contact reminder data changes. Scheduling one next occurrence for every active event is more
-   reliable than a three-month window and uses the same number of Android alarms.
+3. The app gives each enabled reminder a recurring Android calendar schedule at 6:00 AM. Android
+   advances that schedule yearly after delivery, so there is no three-month window, daily polling,
+   or notification-plugin work during PIN/biometric login. Reminder changes and backup restores
+   explicitly rebuild the affected schedules.
 4. Trashing or permanently deleting a contact cancels its reminders. Restoring an encrypted backup
    clears every pending Who Called keepsake notification from the previous data set, then calculates
    and schedules all enabled birthday and anniversary reminders from the restored contacts. This
    also applies when the backup is moved to a different Android device.
 5. The **Alert Directory** lists every contact with an active reminder and supports disabling one
    reminder or all of a contact's reminders without opening the editor.
-6. If permission is newly granted after 6:00 AM on the event day, the missed event is scheduled one
-   minute later instead of being skipped until the following year. Normal app launches do not repeat
-   that catch-up notification. Schedules use `allowWhileIdle` so Android can deliver them during
-   Doze.
+6. If permission is newly granted after 6:00 AM on the event day, a separate one-time catch-up is
+   scheduled one minute later instead of skipping the event until the following year. Its negative
+   notification ID cannot replace the yearly schedule. Schedules use `allowWhileIdle` so Android can
+   deliver them during Doze.
 7. Android restores Capacitor local-notification schedules after a reboot. The app does not request
    exact-alarm permission, so battery optimization may deliver a 6:00 AM reminder approximately.
 
