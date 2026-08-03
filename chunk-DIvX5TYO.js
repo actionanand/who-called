@@ -1,0 +1,1 @@
+import {S,t as qe,al as C_,am as ee}from'./main-AWDNJ3O7.js';function w(t){t||(t=S(qe));let i=new ee(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(C_(i))}export{w};
