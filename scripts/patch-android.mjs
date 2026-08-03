@@ -136,18 +136,22 @@ const webViewKeepRules = `
 `;
 const tinkAnnotationComment = `
 
-# Google Tink references these JSR-305 annotations as build-time metadata. Android does not ship
-# the annotation classes, and Tink does not require them at runtime.
+# Google Tink references these JSR-305 and Error Prone annotations as build-time metadata. Android
+# does not ship the annotation classes, and Tink does not require them at runtime.
 `;
 const tinkAnnotationRules = [
   '-dontwarn javax.annotation.Nullable',
   '-dontwarn javax.annotation.concurrent.GuardedBy',
+  '-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue',
+  '-dontwarn com.google.errorprone.annotations.CheckReturnValue',
+  '-dontwarn com.google.errorprone.annotations.Immutable',
+  '-dontwarn com.google.errorprone.annotations.RestrictedApi',
 ];
 let proguardRules = (await fileExists(proguardPath)) ? await readFile(proguardPath, 'utf8') : '';
 if (!proguardRules.includes('@android.webkit.JavascriptInterface <methods>')) {
   proguardRules = `${proguardRules.trimEnd()}${webViewKeepRules}`;
 }
-if (!proguardRules.includes('# Google Tink references these JSR-305 annotations')) {
+if (!proguardRules.includes('# Google Tink references these JSR-305 and Error Prone annotations')) {
   proguardRules = `${proguardRules.trimEnd()}${tinkAnnotationComment}`;
 }
 for (const annotationRule of tinkAnnotationRules) {
