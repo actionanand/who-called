@@ -3,7 +3,12 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { PrivateContact } from '../models/app.models';
 import { contactDisplayName } from '../utils/contact-privacy';
-import { KeepsakeEvent, keepsakeEvents, keepsakeNotificationDate } from '../utils/keepsake-events';
+import {
+  dateForYear,
+  KeepsakeEvent,
+  keepsakeEvents,
+  keepsakeNotificationDate,
+} from '../utils/keepsake-events';
 
 @Service()
 export class KeepsakeReminderService {
@@ -15,8 +20,7 @@ export class KeepsakeReminderService {
     if (!this.isAndroid()) return true;
     try {
       const current = await LocalNotifications.checkPermissions();
-      const status =
-        current.display === 'granted' ? current : await LocalNotifications.requestPermissions();
+      const status = await LocalNotifications.requestPermissions();
       const granted = status.display === 'granted';
       this.permission.set(granted ? 'granted' : 'denied');
       this.lastError.set(granted ? '' : 'Android notification permission was not granted.');
@@ -65,30 +69,27 @@ export class KeepsakeReminderService {
           autoCancel: true,
           extra: { source: 'who-called', contactId: event.contact.id, kind: event.kind },
         };
-        const recurring = {
-          ...shared,
-          id,
-          schedule: {
-            on: {
-              month: event.month,
-              day: event.month === 2 && event.day === 29 ? 28 : event.day,
-              hour: 6,
-              minute: 0,
-            },
-            repeats: true,
-            allowWhileIdle: true,
-          },
-        };
-        if (!catchUpMissedToday || event.nextDate.getTime() > now.getTime()) {
-          return [recurring];
-        }
+        const firstAt =
+          event.nextDate.getTime() > now.getTime()
+            ? event.nextDate
+            : catchUpMissedToday
+              ? keepsakeNotificationDate(event.nextDate, now)
+              : dateForYear(now.getFullYear() + 1, event.month, event.day);
+        const followingAt = dateForYear(firstAt.getFullYear() + 1, event.month, event.day);
         return [
-          recurring,
           {
             ...shared,
-            id: this.catchUpNotificationId(id),
+            id,
             schedule: {
-              at: keepsakeNotificationDate(event.nextDate, now),
+              at: firstAt,
+              allowWhileIdle: true,
+            },
+          },
+          {
+            ...shared,
+            id: this.followingNotificationId(id),
+            schedule: {
+              at: followingAt,
               allowWhileIdle: true,
             },
           },
@@ -135,7 +136,7 @@ export class KeepsakeReminderService {
     const recurringIds = Array.from({ length: 4 }, (_, index) =>
       this.notificationId(contactId, index),
     );
-    return [...recurringIds, ...recurringIds.map((id) => this.catchUpNotificationId(id))];
+    return [...recurringIds, ...recurringIds.map((id) => this.followingNotificationId(id))];
   }
 
   private notificationIdForEvent(event: KeepsakeEvent): number {
@@ -174,15 +175,15 @@ export class KeepsakeReminderService {
     return 100_000_000 + (Math.abs(hash) % 400_000_000) * 4 + offset;
   }
 
-  private catchUpNotificationId(recurringId: number): number {
-    return -recurringId;
+  private followingNotificationId(firstId: number): number {
+    return -firstId;
   }
 
   private async ensureChannel(): Promise<void> {
     await LocalNotifications.createChannel({
       id: this.channelId,
       name: 'Birthdays and anniversaries',
-      description: 'Yearly contact keepsake reminders at 6:00 AM',
+      description: 'Birthday and anniversary reminders at 6:00 AM',
       importance: 4,
       visibility: 0,
       lights: true,

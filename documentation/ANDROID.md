@@ -127,32 +127,43 @@ pattern as the reference CardNest application:
 
 1. After the first unlocked render, an in-app explanation asks the user whether to enable local
    notifications. Android's system permission prompt opens only after the user chooses **Allow
-   notifications**. If setup is postponed or denied, the in-app explanation returns on a later app
-   launch. It is marked complete only after permission is granted and current reminders are
-   scheduled. Enabling a reminder later also requests permission if it is still unavailable.
+   notifications**. That choice is recorded before Android takes over the activity, so an OEM WebView
+   recreation cannot trap the user on the same explanation after reopening. Notification permission
+   can still be enabled later from Settings.
 2. Each contact has stable notification IDs: one birthday reminder and up to three anniversary
    reminders. Editing a contact cancels and recreates that contact's schedules, preventing
    duplicates.
-3. The app gives each enabled reminder a recurring Android calendar schedule at 6:00 AM. Android
-   advances that schedule yearly after delivery, so there is no three-month window, daily polling,
-   or notification-plugin work during PIN/biometric login. Reminder changes and backup restores
-   explicitly rebuild the affected schedules.
+3. Following CardNest's stable native path, the app creates ordinary timestamp-based Android alarms
+   at 6:00 AM instead of recurring-calendar payloads. The next two yearly occurrences are kept for
+   every enabled event. Reminder changes and backup restores explicitly rebuild that two-occurrence
+   horizon, without notification-plugin work during PIN/biometric login.
 4. Trashing or permanently deleting a contact cancels its reminders. Restoring an encrypted backup
    clears every pending Who Called keepsake notification from the previous data set, then calculates
    and schedules all enabled birthday and anniversary reminders from the restored contacts. This
    also applies when the backup is moved to a different Android device.
 5. The **Alert Directory** lists every contact with an active reminder and supports disabling one
    reminder or all of a contact's reminders without opening the editor.
-6. If permission is newly granted after 6:00 AM on the event day, a separate one-time catch-up is
-   scheduled one minute later instead of skipping the event until the following year. Its negative
-   notification ID cannot replace the yearly schedule. Schedules use `allowWhileIdle` so Android can
-   deliver them during Doze.
+6. If permission is newly granted after 6:00 AM on the event day, the first concrete alarm is
+   scheduled one minute later instead of skipping the event until the following year. Schedules use
+   `allowWhileIdle` so Android can deliver them during Doze.
 7. Android restores Capacitor local-notification schedules after a reboot. The app does not request
    exact-alarm permission, so battery optimization may deliver a 6:00 AM reminder approximately.
 
 The reminder channel is private on the lock screen and uses the existing monochrome
 `ic_stat_who_called` notification icon. Web builds can store reminder choices for backup and later
 Android use, but do not display browser notifications.
+
+## Android storage clearing and backup
+
+Who Called uses its own password-protected `.contactvault` export for device migration. The generated
+Android manifest therefore disables Android Auto Backup and excludes the WebView database, files and
+preferences from both cloud backup and device-to-device transfer rules. This prevents Android from
+silently restoring private contacts or the PIN verifier after the user clears the app's storage.
+
+When the encrypted settings record is absent, startup also removes any orphaned biometric-wrapped PIN
+from Android SharedPreferences and the Android Keystore. **Clear storage/data** in Android Settings
+therefore resets contacts, messages, tags, PIN and biometric unlock. **Clear cache** does not erase
+user data and is intentionally different.
 
 ## Security notes
 

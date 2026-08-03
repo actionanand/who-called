@@ -235,7 +235,9 @@ export class AppStore {
   private async initialize(): Promise<void> {
     try {
       const settings = await this.database.list<AppSettings & { readonly id: string }>('settings');
-      this.settings.set({ ...DEFAULT_SETTINGS, ...(settings[0] ?? {}) });
+      const storedSettings = settings[0];
+      if (!storedSettings) this.native.disableBiometric();
+      this.settings.set({ ...DEFAULT_SETTINGS, ...(storedSettings ?? {}) });
       this.themeService.apply(this.settings().theme);
       this.native.setScreenshotProtection(this.settings().screenshotProtection);
       if (this.settings().pinEnabled) this.locked.set(true);
