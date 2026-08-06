@@ -28,7 +28,11 @@ import {
   messageFormatState,
   toggleMessageFormat,
 } from '../../core/utils/message-formatting';
-import { detectLikelyCode } from '../../core/utils/otp';
+import {
+  DetectedMessageValue,
+  DetectedMessageValueKind,
+  detectMessageValue,
+} from '../../core/utils/otp';
 import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
@@ -73,6 +77,7 @@ export class SavedMessages {
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly detectedCode = signal('');
+  protected readonly detectedKind = signal<DetectedMessageValueKind>('otp');
   protected readonly copied = signal('');
   protected readonly selectedMessage = signal<SavedMessage | null>(null);
   protected readonly selectedRange = signal<MessageTextRange | null>(null);
@@ -112,12 +117,10 @@ export class SavedMessages {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parameters) => {
       if (parameters.has('add')) this.openEditor();
     });
-    this.form.controls.message.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((message) => this.detectedCode.set(detectLikelyCode(message)));
-    this.form.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.saveError.set(''));
+    this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.updateDetectedValue();
+      this.saveError.set('');
+    });
 
     const sharedText = this.store.pendingSharedText();
     if (sharedText) {
@@ -131,6 +134,7 @@ export class SavedMessages {
   protected openEditor(): void {
     this.form.reset({ title: '', message: '', category: 'OTP', sender: '', favorite: false });
     this.detectedCode.set('');
+    this.detectedKind.set('otp');
     this.saveError.set('');
     this.editorOpen.set(true);
   }
@@ -165,6 +169,7 @@ export class SavedMessages {
         category: value.category,
         sender: value.sender.trim(),
         detectedCode: this.detectedCode(),
+        detectedKind: this.detectedKind(),
         favorite: value.favorite,
         createdAt: new Date().toISOString(),
       });
@@ -193,6 +198,25 @@ export class SavedMessages {
   protected openMessage(message: SavedMessage): void {
     this.selectedMessage.set(message);
     this.selectedRange.set(null);
+  }
+
+  protected messageDetection(message: SavedMessage): DetectedMessageValue {
+    if (message.detectedKind) {
+      return { value: message.detectedCode, kind: message.detectedKind };
+    }
+    const detected = detectMessageValue(message.message, message.category);
+    return detected.value
+      ? detected
+      : {
+          value: message.detectedCode,
+          kind: message.category.toLocaleUpperCase() === 'OTP' ? 'otp' : 'code',
+        };
+  }
+
+  protected detectedLabel(kind: DetectedMessageValueKind): string {
+    if (kind === 'amount') return 'Detected amount';
+    if (kind === 'otp') return 'Detected OTP';
+    return 'Detected code';
   }
 
   protected closeMessage(): void {
@@ -409,6 +433,15 @@ export class SavedMessages {
     const schedule = this.document.defaultView?.requestAnimationFrame;
     if (schedule) schedule(() => restore());
     else setTimeout(restore);
+  }
+
+  private updateDetectedValue(): void {
+    const detected = detectMessageValue(
+      this.form.controls.message.value,
+      this.form.controls.category.value,
+    );
+    this.detectedCode.set(detected.value);
+    this.detectedKind.set(detected.kind);
   }
 
   private domPointForMessageOffset(

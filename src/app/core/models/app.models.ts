@@ -65,6 +65,7 @@ export interface SavedMessage {
   readonly category: string;
   readonly sender: string;
   readonly detectedCode: string;
+  readonly detectedKind?: 'otp' | 'amount' | 'code';
   readonly favorite: boolean;
   readonly formats?: readonly MessageTextFormat[];
   readonly createdAt: string;
