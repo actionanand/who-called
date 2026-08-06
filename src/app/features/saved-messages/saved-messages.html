@@ -40,13 +40,16 @@
             <strong>{{ message.title }}</strong>
             <span>{{ message.message }}</span>
           </button>
-          @if (message.detectedCode) {
-            <button class="code-pill" type="button" (click)="copy(message.detectedCode)">
-              <span
-                ><small>Detected code</small><strong>{{ message.detectedCode }}</strong></span
-              >
-              <app-icon [name]="copied() === message.detectedCode ? 'check' : 'copy'" />
-            </button>
+          @if (messageDetection(message); as detection) {
+            @if (detection.value) {
+              <button class="code-pill" type="button" (click)="copy(detection.value)">
+                <span
+                  ><small>{{ detectedLabel(detection.kind) }}</small
+                  ><strong>{{ detection.value }}</strong></span
+                >
+                <app-icon [name]="copied() === detection.value ? 'check' : 'copy'" />
+              </button>
+            }
           }
           <footer>
             <span class="message-meta">
@@ -129,13 +132,16 @@
     </div>
     <!-- prettier-ignore -->
     <div #messageBody class="message-body" tabindex="0" aria-label="Saved message text. Select text to format it." (pointerup)="captureSelection()" (keyup)="captureSelection()"><app-message-formatted-text [parts]="displayParts()" (activated)="handleEntity($event)" /></div>
-    @if (message.detectedCode) {
-      <div class="detected">
-        <span
-          ><small>Detected code</small><strong>{{ message.detectedCode }}</strong></span
-        >
-        <app-icon name="check" />
-      </div>
+    @if (messageDetection(message); as detection) {
+      @if (detection.value) {
+        <div class="detected">
+          <span
+            ><small>{{ detectedLabel(detection.kind) }}</small
+            ><strong>{{ detection.value }}</strong></span
+          >
+          <app-icon name="check" />
+        </div>
+      }
     }
     <div class="message-details-actions">
       <button class="secondary-button" type="button" (click)="closeMessage()">Close</button>
@@ -309,7 +315,8 @@
       @if (detectedCode()) {
         <div class="detected">
           <span
-            ><small>Detected code</small><strong>{{ detectedCode() }}</strong></span
+            ><small>{{ detectedLabel(detectedKind()) }}</small
+            ><strong>{{ detectedCode() }}</strong></span
           >
           <app-icon name="check" />
         </div>
