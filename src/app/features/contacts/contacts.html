@@ -17,6 +17,14 @@
     </div>
     @if (selectionMode()) {
       <div class="selection-actions">
+        <button
+          type="button"
+          [attr.aria-label]="allSelected() ? 'Deselect all' : 'Select all'"
+          [attr.aria-pressed]="allSelected()"
+          (click)="toggleSelectAll()"
+        >
+          <app-icon name="contacts" />
+        </button>
         @if (trashView()) {
           <button type="button" aria-label="Restore selected contacts" (click)="restoreSelection()">
             <app-icon name="restore" />
@@ -731,6 +739,9 @@
         <div class="details-actions">
           <button class="secondary-button" type="button" (click)="editContact(contact)">
             <app-icon name="edit" /> Edit
+          </button>
+          <button class="secondary-button danger" type="button" (click)="deleteContact(contact)">
+            <app-icon name="trash" /> Delete
           </button>
           <button class="primary-button" type="button" (click)="openPhoneAction(contact, 'call')">
             <app-icon name="phone" /> Call

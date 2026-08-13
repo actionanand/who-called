@@ -1,12 +1,41 @@
 <div class="page tagged-page">
   <header class="page-heading heading-row">
     <div>
-      <h1>Tagged numbers</h1>
-      <p>Remember an unknown caller without creating a contact.</p>
+      @if (selectionMode()) {
+        <p class="selection-eyebrow">Selection</p>
+        <h1>{{ selectedIds().size }} selected</h1>
+      } @else {
+        <h1>Tagged numbers</h1>
+        <p>Remember an unknown caller without creating a contact.</p>
+      }
     </div>
-    <button class="primary-button add-button" type="button" (click)="openEditor()">
-      <app-icon name="plus" /><span>Add</span>
-    </button>
+    @if (selectionMode()) {
+      <div class="selection-actions">
+        <button
+          type="button"
+          [attr.aria-label]="allSelected() ? 'Deselect all' : 'Select all'"
+          [attr.aria-pressed]="allSelected()"
+          (click)="toggleSelectAll()"
+        >
+          <app-icon name="tag" />
+        </button>
+        <button
+          class="danger"
+          type="button"
+          aria-label="Delete selected tagged numbers"
+          (click)="deleteSelection()"
+        >
+          <app-icon name="trash" />
+        </button>
+        <button type="button" aria-label="Clear selection" (click)="clearSelection()">
+          <app-icon name="close" />
+        </button>
+      </div>
+    } @else {
+      <button class="primary-button add-button" type="button" (click)="openEditor()">
+        <app-icon name="plus" /><span>Add</span>
+      </button>
+    }
   </header>
 
   <label class="search-box">
@@ -23,7 +52,30 @@
   @if (filtered().length) {
     <section class="tag-stack" aria-label="Tagged numbers">
       @for (number of filtered(); track number.id) {
-        <article class="card tag-card">
+        <article
+          class="card tag-card"
+          [class.selection-mode]="selectionMode()"
+          [class.selected]="selectedIds().has(number.id)"
+          (pointerdown)="startHold(number, $event)"
+          (pointerup)="cancelHold()"
+          (pointercancel)="cancelHold()"
+          (pointerleave)="cancelHold()"
+        >
+          <button
+            class="selection-toggle"
+            type="button"
+            [attr.aria-pressed]="selectedIds().has(number.id)"
+            [attr.aria-label]="
+              selectedIds().has(number.id)
+                ? 'Deselect ' + number.normalizedPhone
+                : 'Select ' + number.normalizedPhone
+            "
+            (click)="toggleSelection(number.id)"
+          >
+            @if (selectedIds().has(number.id)) {
+              <app-icon name="check" />
+            }
+          </button>
           <button
             class="tag-icon"
             type="button"

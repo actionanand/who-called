@@ -462,10 +462,19 @@
 }
 
 .details-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.65rem;
   margin-top: 0.2rem;
+}
+
+.details-actions button {
+  flex: 1 1 7rem;
+}
+
+.details-actions .secondary-button.danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border-subtle));
+  color: var(--danger);
 }
 
 .status {

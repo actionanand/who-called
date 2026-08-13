@@ -57,6 +57,8 @@ export class TaggedNumbers {
     readonly packages: readonly WhatsAppPackage[];
   } | null>(null);
   protected readonly search = signal('');
+  protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
   protected readonly tagOptions: readonly SelectPickerOption[] = DEFAULT_TAGS.map((value) => ({
     value,
     label: value,
@@ -72,6 +74,16 @@ export class TaggedNumbers {
           .includes(query),
       );
   });
+  protected readonly selectedNumbers = computed(() => {
+    const ids = this.selectedIds();
+    return this.store.taggedNumbers().filter((number) => ids.has(number.id));
+  });
+  protected readonly allSelected = computed(() => {
+    const list = this.filtered();
+    const ids = this.selectedIds();
+    return list.length > 0 && list.every((number) => ids.has(number.id));
+  });
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly form = this.formBuilder.nonNullable.group({
     phone: ['', [Validators.required, Validators.minLength(6)]],
     name: ['', Validators.maxLength(120)],
@@ -81,6 +93,7 @@ export class TaggedNumbers {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.cancelHold());
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parameters) => {
       if (!parameters.has('add')) return;
       this.openEditor(undefined, this.store.pendingTaggedNumber());
@@ -176,6 +189,62 @@ export class TaggedNumbers {
     if (!choice) return;
     this.whatsappChoice.set(null);
     this.native.openWhatsAppIn(choice.number, '', packageName);
+  }
+
+  protected toggleSelection(id: string): void {
+    this.selectedIds.update((selected) => {
+      const next = new Set(selected);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  protected toggleSelectAll(): void {
+    if (this.allSelected()) {
+      this.clearSelection();
+      return;
+    }
+    this.selectedIds.set(new Set(this.filtered().map((number) => number.id)));
+  }
+
+  protected startHold(number: TaggedNumber, event: PointerEvent): void {
+    if (event.pointerType !== 'touch' || this.isInteractiveTarget(event.target)) return;
+    this.cancelHold();
+    this.holdTimer = setTimeout(() => {
+      this.toggleSelection(number.id);
+      navigator.vibrate?.(25);
+    }, 550);
+  }
+
+  protected cancelHold(): void {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = null;
+  }
+
+  protected async deleteSelection(): Promise<void> {
+    const numbers = this.selectedNumbers();
+    if (!numbers.length) return;
+    const confirmed = await this.feedback.confirm({
+      title: numbers.length === 1 ? 'Delete tagged number?' : 'Delete tagged numbers?',
+      message:
+        'The temporary tags and notes will be deleted. Matching device call history and private contacts will not be affected.',
+      confirmLabel: numbers.length === 1 ? 'Delete tag & note' : `Delete ${numbers.length} tags`,
+    });
+    if (!confirmed) return;
+    for (const number of numbers) await this.store.removeTaggedNumber(number.id);
+    this.clearSelection();
+    this.feedback.notify(
+      numbers.length === 1 ? 'Tagged number deleted' : `${numbers.length} tagged numbers deleted`,
+    );
+  }
+
+  private isInteractiveTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(target.closest('button, a, input, textarea'));
   }
 
   protected openDetails(number: TaggedNumber): void {
