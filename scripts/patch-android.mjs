@@ -34,6 +34,10 @@ const splashIconPath = resolve(resPath, 'drawable/who_called_splash_icon.xml');
 const splashPath = resolve(resPath, 'drawable/splash.xml');
 const enableCallLog = process.env.ENABLE_DEVICE_CALL_LOG !== 'false';
 
+const environmentSource = await readFile(resolve('src/environments/environment.ts'), 'utf8');
+const callHistoryLimitMatch = environmentSource.match(/callHistoryLimit\s*:\s*(\d+)/);
+const callHistoryLimit = callHistoryLimitMatch ? Number(callHistoryLimitMatch[1]) : 100;
+
 await access(javaPath).catch(() => {
   throw new Error(`Android project file not found: ${javaPath}. Run "npx cap add android" first.`);
 });
@@ -917,7 +921,7 @@ public class MainActivity extends BridgeActivity {
       int durationIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION);
       int nameIndex = cursor.getColumnIndexOrThrow(CallLog.Calls.CACHED_NAME);
       int count = 0;
-      while (cursor.moveToNext() && count < 100) {
+      while (cursor.moveToNext() && count < ${callHistoryLimit}) {
         String number = cursor.getString(numberIndex);
         String cachedName = cursor.getString(nameIndex);
         JSONObject call = new JSONObject()

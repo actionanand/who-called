@@ -1,7 +1,3 @@
-const KEYWORD_CODE =
-  /\b(?:otp|code|pin|verification|delivery|reference|ref)\D{0,16}([A-Z0-9]{4,10})\b/i;
-const STANDALONE_CODE = /\b(\d{4,8})\b/;
-
 const CURRENCY_TOKEN = String.raw`(?:\u20B9|Rs\.?|INR|USD|US\$|\$|EUR|\u20AC|GBP|\u00A3|AED|SAR|JPY|CNY|RMB|\u00A5|CAD|AUD|SGD|NZD|CHF|HKD)`;
 const AMOUNT_TOKEN = String.raw`\d+(?:,\d+)*(?:\.\d{1,2})?`;
 const PREFIXED_AMOUNT = new RegExp(
@@ -25,7 +21,111 @@ interface CurrencyAmountCandidate {
 }
 
 export function detectLikelyCode(message: string): string {
-  return message.match(KEYWORD_CODE)?.[1] ?? message.match(STANDALONE_CODE)?.[1] ?? '';
+  const candidates = collectCodeCandidates(message);
+  if (candidates.length === 0) return '';
+  const keywords = collectCodeKeywords(message);
+  let best: (CodeCandidate & { readonly score: number }) | null = null;
+  for (const candidate of candidates) {
+    const score = scoreCodeCandidate(message, candidate, keywords);
+    if (!best || score > best.score) best = { ...candidate, score };
+  }
+  if (best && best.score > 0) return best.value;
+  const fallback = candidates.find((candidate) => candidate.kind === 'digits') ?? candidates[0];
+  return fallback.value;
+}
+
+interface CodeCandidate {
+  readonly index: number;
+  readonly end: number;
+  readonly value: string;
+  readonly kind: 'hyphen' | 'mixed' | 'digits';
+}
+
+interface CodeKeyword {
+  readonly start: number;
+  readonly end: number;
+  readonly weight: number;
+}
+
+const HYPHENATED_CODE = /\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+\b/g;
+const MIXED_CODE = /\b(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{4,10}\b/g;
+const DIGIT_CODE = /\b\d{4,8}\b/g;
+const STRONG_KEYWORD =
+  /\b(?:otp|one[\s-]?time(?:\s+(?:password|passcode|pin|code))?|passcode|password|verification|verify|secret|security\s+code|authentication(?:\s+code)?|auth\s+code)\b/gi;
+const WEAK_KEYWORD = /\b(?:code|pin|reference|ref|delivery)\b/gi;
+
+function collectCodeCandidates(message: string): readonly CodeCandidate[] {
+  const found = new Map<number, CodeCandidate>();
+  const add = (index: number, value: string, kind: CodeCandidate['kind']): void => {
+    if (!found.has(index)) found.set(index, { index, end: index + value.length, value, kind });
+  };
+  for (const match of message.matchAll(HYPHENATED_CODE)) {
+    if (match.index !== undefined && acceptHyphenatedCode(match[0])) {
+      add(match.index, match[0], 'hyphen');
+    }
+  }
+  for (const match of message.matchAll(MIXED_CODE)) {
+    if (match.index !== undefined) add(match.index, match[0], 'mixed');
+  }
+  for (const match of message.matchAll(DIGIT_CODE)) {
+    if (match.index !== undefined) add(match.index, match[0], 'digits');
+  }
+  return [...found.values()].sort((left, right) => left.index - right.index);
+}
+
+function acceptHyphenatedCode(value: string): boolean {
+  if (!/\d/u.test(value)) return false;
+  if (/[A-Za-z]/u.test(value)) return true;
+  return value.split('-').every((group) => group.length >= 3);
+}
+
+function collectCodeKeywords(message: string): readonly CodeKeyword[] {
+  const keywords: CodeKeyword[] = [];
+  for (const match of message.matchAll(STRONG_KEYWORD)) {
+    if (match.index !== undefined) {
+      keywords.push({ start: match.index, end: match.index + match[0].length, weight: 9 });
+    }
+  }
+  for (const match of message.matchAll(WEAK_KEYWORD)) {
+    if (match.index !== undefined) {
+      keywords.push({ start: match.index, end: match.index + match[0].length, weight: 5 });
+    }
+  }
+  return keywords;
+}
+
+function scoreCodeCandidate(
+  message: string,
+  candidate: CodeCandidate,
+  keywords: readonly CodeKeyword[],
+): number {
+  let score = keywordProximityScore(candidate, keywords);
+  const before = message.slice(Math.max(0, candidate.index - 16), candidate.index);
+  if (
+    /\b(?:is|are|:)\s*$/iu.test(message.slice(Math.max(0, candidate.index - 6), candidate.index))
+  ) {
+    score += 2;
+  }
+  if (new RegExp(`${CURRENCY_TOKEN}\\s*$`, 'iu').test(before)) score -= 8;
+  if (/\b(?:card|ending|a\/c|acct|account|bal|balance|xx+)\b\W*$/iu.test(before)) score -= 5;
+  if (candidate.kind === 'hyphen') score += 3;
+  else if (candidate.kind === 'digits') score += 1;
+  return score;
+}
+
+function keywordProximityScore(candidate: CodeCandidate, keywords: readonly CodeKeyword[]): number {
+  const maxGap = 45;
+  let best = 0;
+  for (const keyword of keywords) {
+    let gap: number;
+    if (candidate.index >= keyword.end) gap = candidate.index - keyword.end;
+    else if (keyword.start >= candidate.end) gap = keyword.start - candidate.end + 6;
+    else continue;
+    if (gap > maxGap) continue;
+    const value = keyword.weight * (1 - gap / (maxGap + 1));
+    if (value > best) best = value;
+  }
+  return best;
 }
 
 export function detectMessageValue(message: string, category: string): DetectedMessageValue {

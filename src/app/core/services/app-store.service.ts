@@ -199,7 +199,7 @@ export class AppStore {
     ]);
     const contacts = await this.purgeExpiredContacts(storedContacts);
     this.contacts.set(contacts);
-    this.messages.set(messages);
+    this.messages.set(await this.purgeExpiredMessages(messages));
     this.taggedNumbers.set(taggedNumbers);
     // Scheduled notifications are persisted by Capacitor and restored by Android. Rebuilding them
     // here couples a native notification operation to PIN/biometric authentication and can keep the
@@ -223,6 +223,23 @@ export class AppStore {
     );
     await Promise.all([...expiredIds].map((id) => this.database.remove('contact', id)));
     return contacts.filter((contact) => !expiredIds.has(contact.id));
+  }
+
+  private async purgeExpiredMessages(
+    messages: readonly SavedMessage[],
+  ): Promise<readonly SavedMessage[]> {
+    const now = Date.now();
+    const expiredIds = new Set(
+      messages
+        .filter((message) => {
+          if (!message.expiresAt) return false;
+          const expiresAt = Date.parse(message.expiresAt);
+          return Number.isFinite(expiresAt) && expiresAt <= now;
+        })
+        .map((message) => message.id),
+    );
+    await Promise.all([...expiredIds].map((id) => this.database.remove('message', id)));
+    return messages.filter((message) => !expiredIds.has(message.id));
   }
 
   lockAndClear(): void {

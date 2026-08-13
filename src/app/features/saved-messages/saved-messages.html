@@ -57,6 +57,9 @@
               <time [attr.datetime]="message.createdAt">
                 Saved {{ savedAt(message.createdAt) }}
               </time>
+              @if (autoDeleteLabel(message); as expiry) {
+                <small class="auto-delete-note"><app-icon name="trash" /> {{ expiry }}</small>
+              }
             </span>
             <button class="text-link" type="button" (click)="copy(message.message)">
               Copy message
@@ -344,6 +347,19 @@
         <span><strong>Mark as favourite</strong><small>Keep this message near the top</small></span>
         <input type="checkbox" formControlName="favorite" />
       </label>
+      <div class="field">
+        <label for="message-auto-delete">Automatic deletion <span>(optional)</span></label>
+        <app-select-picker
+          [value]="form.controls.autoDelete.value"
+          [options]="autoDeleteOptions"
+          sheetTitle="Automatic deletion"
+          (valueChange)="setAutoDelete($event)"
+        />
+        <small class="field-hint">
+          This message is removed automatically after the selected time. OTP messages default to 2
+          weeks.
+        </small>
+      </div>
       @if (saveError()) {
         <p class="save-error" role="alert"><app-icon name="alert" /> {{ saveError() }}</p>
       }
