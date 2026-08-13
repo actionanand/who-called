@@ -99,6 +99,11 @@ export class Contacts {
     const ids = this.selectedIds();
     return this.store.contacts().filter((contact) => ids.has(contact.id));
   });
+  protected readonly allSelected = computed(() => {
+    const list = this.filteredContacts();
+    const ids = this.selectedIds();
+    return list.length > 0 && list.every((contact) => ids.has(contact.id));
+  });
   protected readonly formatPhone = formatIndianPhone;
   protected readonly phoneTypes = PHONE_TYPES;
   protected readonly emailTypes = EMAIL_TYPES;
@@ -444,6 +449,14 @@ export class Contacts {
     this.selectedIds.set(new Set());
   }
 
+  protected toggleSelectAll(): void {
+    if (this.allSelected()) {
+      this.clearSelection();
+      return;
+    }
+    this.selectedIds.set(new Set(this.filteredContacts().map((contact) => contact.id)));
+  }
+
   protected startHold(contact: PrivateContact, event: PointerEvent): void {
     if (event.pointerType !== 'touch' || this.isInteractiveTarget(event.target)) return;
     this.cancelHold();
@@ -610,6 +623,24 @@ export class Contacts {
   protected editContact(contact: PrivateContact): void {
     this.closeContactDetails();
     this.openEditor(contact);
+  }
+
+  protected async deleteContact(contact: PrivateContact): Promise<void> {
+    this.closeContactDetails();
+    const permanently = this.trashView();
+    const confirmed = await this.feedback.confirm({
+      title: permanently ? 'Delete contact permanently?' : 'Move contact to Trash?',
+      message: permanently
+        ? 'This cannot be undone. Device call history will not be deleted.'
+        : 'You can restore it from Trash for the next 30 days.',
+      confirmLabel: permanently ? 'Delete permanently' : 'Move to Trash',
+    });
+    if (!confirmed) return;
+    if (permanently) await this.store.removeContact(contact.id);
+    else await this.store.trashContact(contact.id);
+    this.feedback.notify(
+      permanently ? `${contact.name} permanently deleted` : `${contact.name} moved to Trash`,
+    );
   }
 
   protected contactPhones(contact: PrivateContact): readonly ContactPhone[] {
