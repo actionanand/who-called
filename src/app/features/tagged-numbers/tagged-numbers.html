@@ -32,18 +32,15 @@
           >
             <app-icon name="tag" />
           </button>
-          <div>
+          <div class="tag-info">
             <strong>{{ number.name || number.normalizedPhone }}</strong>
-            @if (number.name) {
-              <small class="tag-subline">{{ number.normalizedPhone }}</small>
-            }
-            <span class="badge">{{ number.tag }}</span>
+            <span class="tag-line">
+              @if (number.name) {
+                <small class="tag-subline">{{ number.normalizedPhone }}</small>
+              }
+              <span class="badge">{{ number.tag }}</span>
+            </span>
             <p>{{ number.note || 'No note added' }}</p>
-            <small
-              >Seen {{ number.appearanceCount }} time{{
-                number.appearanceCount === 1 ? '' : 's'
-              }}</small
-            >
           </div>
           <div class="actions">
             <button
@@ -62,6 +59,13 @@
               (click)="call(number)"
             >
               <app-icon name="phone" />
+            </button>
+            <button
+              type="button"
+              [attr.aria-label]="'Message ' + number.normalizedPhone + ' on WhatsApp'"
+              (click)="openWhatsApp(number)"
+            >
+              <app-icon name="message" />
             </button>
             <button type="button" aria-label="Delete temporary note" (click)="remove(number.id)">
               <app-icon name="trash" />
@@ -142,11 +146,23 @@
       <button class="secondary-button" type="button" (click)="editFromDetails(number)">
         <app-icon name="edit" /> Edit
       </button>
+      <button class="secondary-button" type="button" (click)="openWhatsApp(number)">
+        <app-icon name="message" /> WhatsApp
+      </button>
       <button class="primary-button" type="button" (click)="call(number)">
         <app-icon name="phone" /> Call
       </button>
     </div>
   </section>
+}
+
+@if (whatsappChoice(); as choice) {
+  <app-whatsapp-app-chooser
+    [style.z-index]="130"
+    [packages]="choice.packages"
+    (chosen)="openWhatsAppIn($event)"
+    (closed)="whatsappChoice.set(null)"
+  />
 }
 
 @if (editorOpen()) {
