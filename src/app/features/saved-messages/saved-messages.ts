@@ -42,14 +42,37 @@ import { MessageFormattedText } from './message-formatted-text';
 const MESSAGE_CATEGORIES: readonly SelectPickerOption[] = [
   'OTP',
   'Delivery',
+  'Tracking',
   'Booking',
   'Appointment',
   'Payment',
   'Auto Pay (E-Mandate)',
+  'Bank info',
   'Account',
   'Personal',
   'Other',
 ].map((value) => ({ value, label: value }));
+
+const AUTO_DELETE_OPTIONS: readonly SelectPickerOption[] = [
+  { value: '', label: 'Keep forever' },
+  { value: '1d', label: '1 day' },
+  { value: '2d', label: '2 days' },
+  { value: '5d', label: '5 days' },
+  { value: '1w', label: '1 week' },
+  { value: '2w', label: '2 weeks' },
+  { value: '1m', label: '1 month' },
+];
+
+const AUTO_DELETE_DURATIONS: Readonly<Record<string, number>> = {
+  '1d': 24 * 60 * 60 * 1000,
+  '2d': 2 * 24 * 60 * 60 * 1000,
+  '5d': 5 * 24 * 60 * 60 * 1000,
+  '1w': 7 * 24 * 60 * 60 * 1000,
+  '2w': 14 * 24 * 60 * 60 * 1000,
+  '1m': 30 * 24 * 60 * 60 * 1000,
+};
+
+const OTP_DEFAULT_AUTO_DELETE = '2w';
 
 const CALLING_CODES_BY_LENGTH = [
   ...new Set(SORTED_COUNTRY_CODES.map((country) => country.callingCode)),
@@ -94,6 +117,8 @@ export class SavedMessages {
   protected readonly saving = signal(false);
   protected readonly saveError = signal('');
   protected readonly categories = MESSAGE_CATEGORIES;
+  protected readonly autoDeleteOptions = AUTO_DELETE_OPTIONS;
+  private autoDeleteUserSet = false;
   protected readonly displayParts = computed(() => {
     const message = this.selectedMessage();
     return message ? messageDisplayParts(message.message, message.formats) : [];
@@ -110,6 +135,7 @@ export class SavedMessages {
     message: ['', [Validators.required, Validators.maxLength(8000)]],
     category: ['OTP', Validators.required],
     sender: ['', Validators.maxLength(120)],
+    autoDelete: [OTP_DEFAULT_AUTO_DELETE],
     favorite: false,
   });
 
@@ -117,6 +143,9 @@ export class SavedMessages {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parameters) => {
       if (parameters.has('add')) this.openEditor();
     });
+    this.form.controls.category.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((category) => this.applyCategoryAutoDelete(category));
     this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.updateDetectedValue();
       this.saveError.set('');
@@ -132,11 +161,32 @@ export class SavedMessages {
   }
 
   protected openEditor(): void {
-    this.form.reset({ title: '', message: '', category: 'OTP', sender: '', favorite: false });
+    this.form.reset({
+      title: '',
+      message: '',
+      category: 'OTP',
+      sender: '',
+      autoDelete: OTP_DEFAULT_AUTO_DELETE,
+      favorite: false,
+    });
+    this.autoDeleteUserSet = false;
     this.detectedCode.set('');
     this.detectedKind.set('otp');
     this.saveError.set('');
     this.editorOpen.set(true);
+  }
+
+  protected setAutoDelete(value: string): void {
+    this.autoDeleteUserSet = true;
+    this.form.controls.autoDelete.setValue(value);
+  }
+
+  private applyCategoryAutoDelete(category: string): void {
+    if (this.autoDeleteUserSet) return;
+    const preferred = category.trim().toLocaleUpperCase() === 'OTP' ? OTP_DEFAULT_AUTO_DELETE : '';
+    if (this.form.controls.autoDelete.value !== preferred) {
+      this.form.controls.autoDelete.setValue(preferred);
+    }
   }
 
   protected closeEditor(): void {
@@ -162,6 +212,8 @@ export class SavedMessages {
     const value = this.form.getRawValue();
     this.saving.set(true);
     try {
+      const createdAt = new Date();
+      const duration = AUTO_DELETE_DURATIONS[value.autoDelete];
       await this.store.addMessage({
         id: crypto.randomUUID(),
         title,
@@ -171,7 +223,8 @@ export class SavedMessages {
         detectedCode: this.detectedCode(),
         detectedKind: this.detectedKind(),
         favorite: value.favorite,
-        createdAt: new Date().toISOString(),
+        createdAt: createdAt.toISOString(),
+        expiresAt: duration ? new Date(createdAt.getTime() + duration).toISOString() : undefined,
       });
       this.closeEditor();
     } catch {
@@ -487,6 +540,13 @@ export class SavedMessages {
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(date);
+  }
+
+  protected autoDeleteLabel(message: SavedMessage): string {
+    if (!message.expiresAt) return '';
+    const expiry = new Date(message.expiresAt);
+    if (Number.isNaN(expiry.getTime())) return '';
+    return `Auto-deletes ${new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(expiry)}`;
   }
 
   protected async remove(id: string, title: string): Promise<void> {

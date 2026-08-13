@@ -24,4 +24,9 @@ export class CallService {
     this.document.defaultView?.location.assign(`tel:${number}`);
     return true;
   }
+
+  placeCall(number = ''): void {
+    if (this.native.openDialler(number)) return;
+    this.document.defaultView?.location.assign(`tel:${number}`);
+  }
 }

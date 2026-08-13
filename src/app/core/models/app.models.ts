@@ -69,6 +69,7 @@ export interface SavedMessage {
   readonly favorite: boolean;
   readonly formats?: readonly MessageTextFormat[];
   readonly createdAt: string;
+  readonly expiresAt?: string;
 }
 
 export interface MessageTextFormat {

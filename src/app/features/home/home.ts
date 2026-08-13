@@ -1,12 +1,18 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { DeviceCallHistoryEntry, PrivateContact, TaggedNumber } from '../../core/models/app.models';
 import { CallService } from '../../core/services/call.service';
 import { AppStore } from '../../core/services/app-store.service';
-import { NativeIntegrationService } from '../../core/services/native-integration.service';
+import {
+  NativeIntegrationService,
+  WhatsAppPackage,
+} from '../../core/services/native-integration.service';
 import { contactDisplayName } from '../../core/utils/contact-privacy';
 import { digitsOnly } from '../../core/utils/phone-number';
+import { environment } from '../../../environments/environment';
 import { AppIcon } from '../../shared/components/app-icon';
+import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
 
 interface HomeCallHistoryEntry extends DeviceCallHistoryEntry {
   readonly contact?: PrivateContact;
@@ -16,7 +22,7 @@ interface HomeCallHistoryEntry extends DeviceCallHistoryEntry {
 
 @Component({
   selector: 'app-home',
-  imports: [AppIcon, RouterLink],
+  imports: [AppIcon, RouterLink, WhatsAppAppChooser],
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
@@ -25,15 +31,24 @@ export class Home {
   private readonly native = inject(NativeIntegrationService);
   private readonly router = inject(Router);
   private readonly calls = inject(CallService);
+  private readonly document = inject(DOCUMENT);
   protected readonly callHistory = signal<readonly DeviceCallHistoryEntry[]>([]);
   protected readonly callHistoryLoading = signal(false);
   protected readonly callHistoryError = signal('');
   protected readonly callHistorySupported = this.native.deviceCallHistorySupported();
+  protected readonly phoneAction = signal<{
+    readonly display: string;
+    readonly number: string;
+  } | null>(null);
+  protected readonly whatsappChoice = signal<{
+    readonly number: string;
+    readonly packages: readonly WhatsAppPackage[];
+  } | null>(null);
   private callHistoryRequested = false;
 
   protected readonly enrichedCallHistory = computed<readonly HomeCallHistoryEntry[]>(() =>
     this.callHistory()
-      .slice(0, 30)
+      .slice(0, environment.callHistoryLimit)
       .map((call) => {
         const key = this.phoneKey(call.number);
         const contact = this.store
@@ -107,7 +122,43 @@ export class Home {
 
   protected callFromHistory(call: HomeCallHistoryEntry): void {
     if (!this.hasDialableNumber(call.number)) return;
-    void this.calls.confirmAndCall(call.number, call.displayName);
+    this.phoneAction.set({ display: call.displayName, number: call.number });
+  }
+
+  protected closePhoneAction(): void {
+    this.phoneAction.set(null);
+  }
+
+  protected confirmPhoneCall(): void {
+    const action = this.phoneAction();
+    if (!action) return;
+    this.phoneAction.set(null);
+    this.calls.placeCall(action.number);
+  }
+
+  protected openPhoneWhatsApp(): void {
+    const action = this.phoneAction();
+    if (!action) return;
+    const number = digitsOnly(action.number);
+    if (!number) return;
+    const packages = this.native.availableWhatsAppApps();
+    this.phoneAction.set(null);
+    if (packages.length > 1) {
+      this.whatsappChoice.set({ number, packages });
+      return;
+    }
+    if (packages.length === 1 && this.native.openWhatsAppIn(number, '', packages[0])) return;
+    if (this.native.openWhatsApp(number, '', this.store.settings().whatsappBusinessFallback)) {
+      return;
+    }
+    this.document.defaultView?.open(`https://wa.me/${number}`, '_blank', 'noopener,noreferrer');
+  }
+
+  protected openWhatsAppIn(packageName: WhatsAppPackage): void {
+    const choice = this.whatsappChoice();
+    if (!choice) return;
+    this.whatsappChoice.set(null);
+    this.native.openWhatsAppIn(choice.number, '', packageName);
   }
 
   protected callIcon(call: DeviceCallHistoryEntry): string {

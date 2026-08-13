@@ -125,3 +125,50 @@
     <span><strong>Offline & encrypted</strong>Your contact data is never uploaded.</span>
   </section>
 </div>
+
+@if (phoneAction(); as action) {
+  <button
+    class="modal-scrim entity-scrim"
+    type="button"
+    aria-label="Close phone number actions"
+    (click)="closePhoneAction()"
+  ></button>
+  <section
+    class="entity-action-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="home-phone-action-title"
+    aria-describedby="home-phone-action-message"
+  >
+    <header>
+      <div>
+        <p>Start a phone call?</p>
+        <h2 id="home-phone-action-title">{{ action.display }}</h2>
+      </div>
+      <button type="button" aria-label="Close phone actions" (click)="closePhoneAction()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <p id="home-phone-action-message" class="entity-action-message">
+      Open the dialler for {{ action.display }}, or send a WhatsApp message instead. You can review
+      the number before placing the call.
+    </p>
+    <div class="entity-action-grid">
+      <button type="button" (click)="confirmPhoneCall()">
+        <app-icon name="phone" /><span><strong>Call</strong><small>Open dialler</small></span>
+      </button>
+      <button type="button" (click)="openPhoneWhatsApp()">
+        <app-icon name="message" /><span><strong>WhatsApp</strong><small>Open chat</small></span>
+      </button>
+    </div>
+  </section>
+}
+
+@if (whatsappChoice(); as choice) {
+  <app-whatsapp-app-chooser
+    [style.z-index]="130"
+    [packages]="choice.packages"
+    (chosen)="openWhatsAppIn($event)"
+    (closed)="whatsappChoice.set(null)"
+  />
+}
