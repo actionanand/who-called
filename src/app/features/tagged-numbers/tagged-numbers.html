@@ -24,9 +24,19 @@
     <section class="tag-stack" aria-label="Tagged numbers">
       @for (number of filtered(); track number.id) {
         <article class="card tag-card">
-          <span class="tag-icon"><app-icon name="tag" /></span>
+          <button
+            class="tag-icon"
+            type="button"
+            [attr.aria-label]="'View details for ' + number.normalizedPhone"
+            (click)="openDetails(number)"
+          >
+            <app-icon name="tag" />
+          </button>
           <div>
-            <strong>{{ number.normalizedPhone }}</strong>
+            <strong>{{ number.name || number.normalizedPhone }}</strong>
+            @if (number.name) {
+              <small class="tag-subline">{{ number.normalizedPhone }}</small>
+            }
             <span class="badge">{{ number.tag }}</span>
             <p>{{ number.note || 'No note added' }}</p>
             <small
@@ -77,6 +87,68 @@
   }
 </div>
 
+@if (selectedNumber(); as number) {
+  <button
+    class="modal-scrim details-scrim"
+    type="button"
+    aria-label="Close tagged number details"
+    (click)="closeDetails()"
+  ></button>
+  <section class="tag-details" role="dialog" aria-modal="true" aria-labelledby="tag-details-title">
+    <header>
+      <div>
+        <p>Tagged number</p>
+        <h2 id="tag-details-title">{{ number.name || number.normalizedPhone }}</h2>
+      </div>
+      <button type="button" aria-label="Close details" (click)="closeDetails()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <div class="detail-chips">
+      <span class="badge">{{ number.tag }}</span>
+      @if (number.important) {
+        <span class="badge important-badge">Important</span>
+      }
+    </div>
+    <dl class="detail-list">
+      @if (number.name) {
+        <div>
+          <dt><app-icon name="user" /> Name</dt>
+          <dd>{{ number.name }}</dd>
+        </div>
+      }
+      <div>
+        <dt><app-icon name="phone" /> Phone number</dt>
+        <dd>{{ number.normalizedPhone }}</dd>
+      </div>
+      <div>
+        <dt><app-icon name="document" /> Note</dt>
+        <dd class="detail-note">{{ number.note || 'No note added' }}</dd>
+      </div>
+      <div>
+        <dt><app-icon name="tag" /> Times seen</dt>
+        <dd>Seen {{ number.appearanceCount }} time{{ number.appearanceCount === 1 ? '' : 's' }}</dd>
+      </div>
+      <div>
+        <dt><app-icon name="clock" /> Last seen</dt>
+        <dd>{{ formatDate(number.lastSeenAt) }}</dd>
+      </div>
+      <div>
+        <dt><app-icon name="calendar" /> Tagged on</dt>
+        <dd>{{ formatDate(number.createdAt) }}</dd>
+      </div>
+    </dl>
+    <div class="detail-actions">
+      <button class="secondary-button" type="button" (click)="editFromDetails(number)">
+        <app-icon name="edit" /> Edit
+      </button>
+      <button class="primary-button" type="button" (click)="call(number)">
+        <app-icon name="phone" /> Call
+      </button>
+    </div>
+  </section>
+}
+
 @if (editorOpen()) {
   <button
     class="modal-scrim"
@@ -108,6 +180,15 @@
             placeholder="98765 43210"
           />
         </div>
+      </div>
+      <div class="field">
+        <label for="tag-name">Name <span>(optional)</span></label>
+        <input
+          id="tag-name"
+          formControlName="name"
+          placeholder="e.g. Jessy Chennai"
+          autocomplete="off"
+        />
       </div>
       <div class="field">
         <label for="number-tag">Tag</label>

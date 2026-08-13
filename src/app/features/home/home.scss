@@ -156,6 +156,19 @@
   font-weight: 750;
 }
 
+.history-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.history-tag.name-chip {
+  max-width: 100%;
+  overflow: hidden;
+  color: #a0482e;
+  background: #fbe7df;
+}
+
 .history-tag app-icon {
   width: 0.8rem;
   height: 0.8rem;
