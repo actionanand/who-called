@@ -1,1 +1,0 @@
-import {S,q as qe,al as g_,am as ee}from'./main-22DIACCP.js';function w(t){t||(t=S(qe));let i=new ee(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(g_(i))}export{w};
