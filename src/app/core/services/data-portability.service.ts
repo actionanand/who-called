@@ -10,6 +10,7 @@ import {
 } from '../models/app.models';
 import { digitsOnly, normalizePhone } from '../utils/phone-number';
 import { AppStore } from './app-store.service';
+import { NativeIntegrationService } from './native-integration.service';
 
 interface BackupEnvelope {
   readonly format: 'who-called-backup';
@@ -33,6 +34,7 @@ const BACKUP_ITERATIONS = 240_000;
 @Injectable({ providedIn: 'root' })
 export class DataPortabilityService {
   private readonly store = inject(AppStore);
+  private readonly native = inject(NativeIntegrationService);
 
   async createEncryptedBackup(passphrase: string): Promise<void> {
     this.validatePassphrase(passphrase);
@@ -60,7 +62,7 @@ export class DataPortabilityService {
       ciphertext: this.toBase64(new Uint8Array(encrypted)),
     };
     const date = new Date().toISOString().slice(0, 10);
-    this.download(
+    await this.saveFile(
       `contacts-backup-${date}.contactvault`,
       JSON.stringify(envelope),
       'application/octet-stream',
@@ -97,7 +99,7 @@ export class DataPortabilityService {
     await this.store.replaceData(snapshot);
   }
 
-  exportCsv(): void {
+  async exportCsv(): Promise<void> {
     const rows = [
       [
         'Name',
@@ -134,10 +136,10 @@ export class DataPortabilityService {
       ]);
     }
     const csv = rows.map((row) => row.map((value) => this.csvCell(value)).join(',')).join('\n');
-    this.download('who-called-contacts.csv', csv, 'text/csv;charset=utf-8');
+    await this.saveFile('who-called-contacts.csv', csv, 'text/csv');
   }
 
-  exportVCard(): void {
+  async exportVCard(): Promise<void> {
     const cards = this.store.activeContacts().map((contact) => {
       const phones = contact.phones?.length
         ? contact.phones
@@ -162,7 +164,7 @@ export class DataPortabilityService {
       ];
       return lines.filter(Boolean).join('\r\n');
     });
-    this.download('who-called-contacts.vcf', cards.join('\r\n'), 'text/vcard;charset=utf-8');
+    await this.saveFile('who-called-contacts.vcf', cards.join('\r\n'), 'text/vcard');
   }
 
   async importCsv(file: File): Promise<number> {
@@ -379,6 +381,14 @@ export class DataPortabilityService {
       .replaceAll('\\,', ',')
       .replaceAll('\\;', ';')
       .replaceAll('\\\\', '\\');
+  }
+
+  private async saveFile(fileName: string, contents: string, type: string): Promise<void> {
+    if (this.native.isAndroid()) {
+      await this.native.exportFile(contents, fileName, type);
+      return;
+    }
+    this.download(fileName, contents, type);
   }
 
   private download(fileName: string, contents: string, type: string): void {

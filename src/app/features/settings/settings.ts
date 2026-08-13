@@ -248,14 +248,32 @@ export class Settings {
     }
   }
 
-  protected exportCsv(): void {
-    this.data.exportCsv();
-    this.feedback.notify('Plaintext CSV exported');
+  protected async exportCsv(): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.data.exportCsv();
+      this.feedback.notify('Plaintext CSV exported');
+    } catch (error: unknown) {
+      this.feedback.notify(
+        error instanceof Error ? error.message : 'The CSV could not be exported.',
+      );
+    } finally {
+      this.busy.set(false);
+    }
   }
 
-  protected exportVCard(): void {
-    this.data.exportVCard();
-    this.feedback.notify('vCard exported');
+  protected async exportVCard(): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.data.exportVCard();
+      this.feedback.notify('vCard exported');
+    } catch (error: unknown) {
+      this.feedback.notify(
+        error instanceof Error ? error.message : 'The vCard could not be exported.',
+      );
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected isAndroid(): boolean {

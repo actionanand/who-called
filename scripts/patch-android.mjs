@@ -384,6 +384,7 @@ public class MainActivity extends BridgeActivity {
   private static final boolean DEVICE_CALL_LOG_ENABLED = ${enableCallLog};
   private static final int CALL_LOG_PERMISSION_REQUEST = 4801;
   private static final int NOTIFICATION_PERMISSION_REQUEST = 4802;
+  private static final int EXPORT_DOCUMENT_REQUEST = 4803;
   private static final String KEEPSAKE_NOTIFICATION_CHANNEL = "who-called-keepsakes";
   private static final String BIOMETRIC_KEY_ALIAS = "who_called_biometric_key";
   private static final String SECURITY_PREFERENCES = "who_called_security";
@@ -393,6 +394,9 @@ public class MainActivity extends BridgeActivity {
   private View launchOverlay;
   private long launchOverlayShownAt;
   private String sharedText = "";
+  private byte[] pendingExportContents;
+  private String pendingExportName;
+  private String pendingExportMime;
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
@@ -415,6 +419,39 @@ public class MainActivity extends BridgeActivity {
     super.onNewIntent(intent);
     setIntent(intent);
     captureSharedText(intent);
+  }
+
+  @Override
+  protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    if (requestCode == EXPORT_DOCUMENT_REQUEST) {
+      byte[] contents = pendingExportContents;
+      pendingExportContents = null;
+      pendingExportName = null;
+      pendingExportMime = null;
+      Uri destination = data == null ? null : data.getData();
+      if (resultCode != RESULT_OK || destination == null || contents == null) {
+        dispatchNativeResult("export-file", false, "", "The export was cancelled.");
+        return;
+      }
+      final byte[] payload = contents;
+      new Thread(() -> {
+        try (java.io.OutputStream output = getContentResolver().openOutputStream(destination, "w")) {
+          if (output == null) throw new IllegalStateException("The selected location could not be opened.");
+          output.write(payload);
+          output.flush();
+          dispatchNativeResult("export-file", true, "", "");
+        } catch (Exception error) {
+          dispatchNativeResult(
+            "export-file",
+            false,
+            "",
+            error.getMessage() == null ? "The file could not be saved." : error.getMessage()
+          );
+        }
+      }).start();
+      return;
+    }
+    super.onActivityResult(requestCode, resultCode, data);
   }
 
   @Override
@@ -514,6 +551,37 @@ public class MainActivity extends BridgeActivity {
       Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(number)));
       intent.putExtra("sms_body", message);
       startActivity(intent);
+    }
+
+    @JavascriptInterface
+    public void exportFile(String content, String filename, String mimeType) {
+      runOnUiThread(() -> {
+        if (pendingExportContents != null) {
+          dispatchNativeResult("export-file", false, "", "Another export is already in progress.");
+          return;
+        }
+        try {
+          pendingExportContents = content == null
+            ? new byte[0]
+            : content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+          pendingExportName = filename == null || filename.isEmpty()
+            ? "who-called-export"
+            : filename.replaceAll("[^A-Za-z0-9._-]", "-");
+          pendingExportMime = mimeType == null || mimeType.isEmpty()
+            ? "application/octet-stream"
+            : mimeType;
+          Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+          intent.addCategory(Intent.CATEGORY_OPENABLE);
+          intent.setType(pendingExportMime);
+          intent.putExtra(Intent.EXTRA_TITLE, pendingExportName);
+          startActivityForResult(intent, EXPORT_DOCUMENT_REQUEST);
+        } catch (Exception error) {
+          pendingExportContents = null;
+          pendingExportName = null;
+          pendingExportMime = null;
+          dispatchNativeResult("export-file", false, "", "The file could not be exported.");
+        }
+      });
     }
 
     @JavascriptInterface
