@@ -11,6 +11,7 @@ interface WhoCalledNativeBridge {
   openWhatsApp(number: string, message: string, businessFallback: boolean): void;
   availableWhatsAppApps(): string;
   openWhatsAppIn(number: string, message: string, packageName: string): void;
+  exportFile(content: string, filename: string, mimeType: string): void;
   setScreenshotProtection(enabled: boolean): void;
   deviceCallHistorySupported(): boolean;
   requestDeviceCallHistory(): void;
@@ -74,6 +75,18 @@ export class NativeIntegrationService {
     if (!bridge) return false;
     bridge.openWhatsAppIn(number, message, packageName);
     return true;
+  }
+
+  exportFile(content: string, filename: string, mimeType: string): Promise<void> {
+    const bridge = this.bridge();
+    if (!bridge) {
+      return Promise.reject(new Error('Saving files is available only on Android.'));
+    }
+    return this.waitForNativeResult(
+      'export-file',
+      () => bridge.exportFile(content, filename, mimeType),
+      300_000,
+    ).then(() => undefined);
   }
 
   setScreenshotProtection(enabled: boolean): void {
@@ -146,7 +159,11 @@ export class NativeIntegrationService {
     return (this.document.defaultView as NativeWindow | null)?.WhoCalledNative;
   }
 
-  private waitForNativeResult(action: string, start: () => void): Promise<string> {
+  private waitForNativeResult(
+    action: string,
+    start: () => void,
+    timeoutMs = 60_000,
+  ): Promise<string> {
     const nativeWindow = this.document.defaultView;
     if (!nativeWindow) return Promise.reject(new Error('The Android bridge is unavailable.'));
     return new Promise<string>((resolve, reject) => {
@@ -176,7 +193,7 @@ export class NativeIntegrationService {
       nativeWindow.addEventListener('who-called-native-result', handleResult);
       timeout = globalThis.setTimeout(
         () => finish(false, '', 'The Android request timed out.'),
-        60_000,
+        timeoutMs,
       );
       try {
         start();
