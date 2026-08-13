@@ -1,4 +1,5 @@
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -6,9 +7,14 @@ import { TaggedNumber } from '../../core/models/app.models';
 import { CallService } from '../../core/services/call.service';
 import { AppStore } from '../../core/services/app-store.service';
 import { FeedbackService } from '../../core/services/feedback.service';
+import {
+  NativeIntegrationService,
+  WhatsAppPackage,
+} from '../../core/services/native-integration.service';
 import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
+import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
 
 const DEFAULT_TAGS = [
   'Fraud',
@@ -29,7 +35,7 @@ const DEFAULT_TAGS = [
 
 @Component({
   selector: 'app-tagged-numbers',
-  imports: [AppIcon, ReactiveFormsModule, SelectPicker],
+  imports: [AppIcon, ReactiveFormsModule, SelectPicker, WhatsAppAppChooser],
   templateUrl: './tagged-numbers.html',
   styleUrl: './tagged-numbers.scss',
 })
@@ -38,12 +44,18 @@ export class TaggedNumbers {
   private readonly feedback = inject(FeedbackService);
   private readonly router = inject(Router);
   private readonly calls = inject(CallService);
+  private readonly native = inject(NativeIntegrationService);
+  private readonly document = inject(DOCUMENT);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly editingNumber = signal<TaggedNumber | null>(null);
   protected readonly selectedNumber = signal<TaggedNumber | null>(null);
+  protected readonly whatsappChoice = signal<{
+    readonly number: string;
+    readonly packages: readonly WhatsAppPackage[];
+  } | null>(null);
   protected readonly search = signal('');
   protected readonly tagOptions: readonly SelectPickerOption[] = DEFAULT_TAGS.map((value) => ({
     value,
@@ -142,6 +154,28 @@ export class TaggedNumbers {
 
   protected call(number: TaggedNumber): void {
     void this.calls.confirmAndCall(number.normalizedPhone, number.normalizedPhone);
+  }
+
+  protected openWhatsApp(taggedNumber: TaggedNumber): void {
+    const number = digitsOnly(taggedNumber.normalizedPhone);
+    if (!number) return;
+    const packages = this.native.availableWhatsAppApps();
+    if (packages.length > 1) {
+      this.whatsappChoice.set({ number, packages });
+      return;
+    }
+    if (packages.length === 1 && this.native.openWhatsAppIn(number, '', packages[0])) return;
+    if (this.native.openWhatsApp(number, '', this.store.settings().whatsappBusinessFallback)) {
+      return;
+    }
+    this.document.defaultView?.open(`https://wa.me/${number}`, '_blank', 'noopener,noreferrer');
+  }
+
+  protected openWhatsAppIn(packageName: WhatsAppPackage): void {
+    const choice = this.whatsappChoice();
+    if (!choice) return;
+    this.whatsappChoice.set(null);
+    this.native.openWhatsAppIn(choice.number, '', packageName);
   }
 
   protected openDetails(number: TaggedNumber): void {
