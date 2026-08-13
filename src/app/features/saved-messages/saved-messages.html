@@ -61,7 +61,7 @@
                 <small class="auto-delete-note"><app-icon name="trash" /> {{ expiry }}</small>
               }
             </span>
-            <button class="text-link" type="button" (click)="copy(message.message)">
+            <button class="text-link" type="button" (click)="copyMessage(message.message)">
               Copy message
             </button>
           </footer>
@@ -148,7 +148,7 @@
     }
     <div class="message-details-actions">
       <button class="secondary-button" type="button" (click)="closeMessage()">Close</button>
-      <button class="primary-button" type="button" (click)="copy(message.message)">
+      <button class="primary-button" type="button" (click)="copyMessage(message.message)">
         <app-icon [name]="copied() === message.message ? 'check' : 'copy'" />
         {{ copied() === message.message ? 'Copied' : 'Copy message' }}
       </button>

@@ -248,6 +248,10 @@ export class SavedMessages {
     }
   }
 
+  protected async copyMessage(message: string): Promise<void> {
+    if (await this.copy(message)) this.feedback.notify('Message copied');
+  }
+
   protected openMessage(message: SavedMessage): void {
     this.selectedMessage.set(message);
     this.selectedRange.set(null);

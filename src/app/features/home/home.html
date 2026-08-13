@@ -84,7 +84,14 @@
               }
             </small>
             @if (call.taggedNumber; as tagged) {
-              <span class="history-tag"><app-icon name="tag" /> {{ tagged.tag }}</span>
+              <span class="history-chips">
+                @if (tagged.name) {
+                  <span class="history-tag name-chip"
+                    ><app-icon name="user" /> {{ tagged.name }}</span
+                  >
+                }
+                <span class="history-tag"><app-icon name="tag" /> {{ tagged.tag }}</span>
+              </span>
             }
           </span>
           <span class="history-actions">

@@ -83,6 +83,7 @@ export interface TaggedNumber {
   readonly id: string;
   readonly phone: string;
   readonly normalizedPhone: string;
+  readonly name?: string;
   readonly tag: string;
   readonly note: string;
   readonly important: boolean;

@@ -43,6 +43,7 @@ export class TaggedNumbers {
   protected readonly store = inject(AppStore);
   protected readonly editorOpen = signal(false);
   protected readonly editingNumber = signal<TaggedNumber | null>(null);
+  protected readonly selectedNumber = signal<TaggedNumber | null>(null);
   protected readonly search = signal('');
   protected readonly tagOptions: readonly SelectPickerOption[] = DEFAULT_TAGS.map((value) => ({
     value,
@@ -54,11 +55,14 @@ export class TaggedNumbers {
     return this.store
       .taggedNumbers()
       .filter((number) =>
-        `${number.phone} ${number.tag} ${number.note}`.toLocaleLowerCase().includes(query),
+        `${number.phone} ${number.name ?? ''} ${number.tag} ${number.note}`
+          .toLocaleLowerCase()
+          .includes(query),
       );
   });
   protected readonly form = this.formBuilder.nonNullable.group({
     phone: ['', [Validators.required, Validators.minLength(6)]],
+    name: ['', Validators.maxLength(120)],
     tag: ['Repeated Call', Validators.required],
     note: ['', Validators.maxLength(1000)],
     important: false,
@@ -76,6 +80,7 @@ export class TaggedNumbers {
     this.editingNumber.set(number ?? null);
     this.form.reset({
       phone: number?.phone ?? draftPhone,
+      name: number?.name ?? '',
       tag: number?.tag ?? 'Repeated Call',
       note: number?.note ?? '',
       important: number?.important ?? false,
@@ -98,6 +103,7 @@ export class TaggedNumbers {
       id: existing?.id ?? crypto.randomUUID(),
       phone: digitsOnly(value.phone),
       normalizedPhone,
+      name: value.name.trim(),
       tag: value.tag,
       note: value.note.trim(),
       important: value.important,
@@ -130,10 +136,32 @@ export class TaggedNumbers {
     });
     if (!confirmed) return;
     await this.store.removeTaggedNumber(id);
+    this.selectedNumber.set(null);
     this.feedback.notify('Tagged number deleted');
   }
 
   protected call(number: TaggedNumber): void {
     void this.calls.confirmAndCall(number.normalizedPhone, number.normalizedPhone);
+  }
+
+  protected openDetails(number: TaggedNumber): void {
+    this.selectedNumber.set(number);
+  }
+
+  protected closeDetails(): void {
+    this.selectedNumber.set(null);
+  }
+
+  protected editFromDetails(number: TaggedNumber): void {
+    this.selectedNumber.set(null);
+    this.openEditor(number);
+  }
+
+  protected formatDate(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Unknown date';
+    return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(
+      date,
+    );
   }
 }

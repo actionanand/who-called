@@ -46,6 +46,7 @@ import {
   LucideTag,
   LucideTrash2,
   LucideUserPlus,
+  LucideUserRound,
   LucideUsersRound,
   LucideWifiOff,
   LucideX,
@@ -100,6 +101,7 @@ const ICONS: Readonly<Record<string, LucideIconInput>> = {
   sun: LucideSun,
   tag: LucideTag,
   trash: LucideTrash2,
+  user: LucideUserRound,
   'user-plus': LucideUserPlus,
 };
 
