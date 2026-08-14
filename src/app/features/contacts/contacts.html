@@ -349,6 +349,17 @@
                 (valueChange)="setPickerValue(phone.controls.type, $event)"
               />
             </div>
+            @if (phone.controls.type.value === 'Other') {
+              <div class="field">
+                <label [for]="'phone-custom-type-' + index">Custom type</label>
+                <input
+                  [id]="'phone-custom-type-' + index"
+                  formControlName="customType"
+                  maxlength="40"
+                  placeholder="e.g. Landline, Reception"
+                />
+              </div>
+            }
             <div class="phone-grid">
               <div class="field code-field">
                 <label [for]="'calling-code-' + index">Code</label>

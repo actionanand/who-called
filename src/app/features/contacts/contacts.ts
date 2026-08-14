@@ -339,7 +339,8 @@ export class Contacts {
     try {
       const phones: readonly ContactPhone[] = usablePhones.map((phone) => ({
         id: phone.id || crypto.randomUUID(),
-        type: phone.type,
+        type:
+          phone.type === 'Other' && phone.customType.trim() ? phone.customType.trim() : phone.type,
         callingCode: phone.callingCode,
         number: digitsOnly(phone.number),
         normalizedNumber: normalizePhone(phone.callingCode, phone.number),
@@ -696,9 +697,11 @@ export class Contacts {
   }
 
   private createPhone(phone?: ContactPhone) {
+    const knownType = !phone || PHONE_TYPES.some((option) => option.value === phone.type);
     return this.formBuilder.nonNullable.group({
       id: phone?.id ?? crypto.randomUUID(),
-      type: phone?.type ?? 'Mobile',
+      type: knownType ? (phone?.type ?? 'Mobile') : 'Other',
+      customType: [knownType ? '' : (phone?.type ?? ''), Validators.maxLength(40)],
       callingCode: phone?.callingCode ?? '+91',
       number: [phone?.number ?? '', [Validators.required, Validators.minLength(6)]],
       whatsappEnabled: phone?.whatsappEnabled ?? true,

@@ -179,3 +179,99 @@
     (closed)="whatsappChoice.set(null)"
   />
 }
+
+@if (saveTarget(); as target) {
+  <button
+    class="modal-scrim entity-scrim"
+    type="button"
+    aria-label="Close save contact options"
+    (click)="closeSaveChoice()"
+  ></button>
+  <section
+    class="entity-action-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="home-save-title"
+    aria-describedby="home-save-message"
+  >
+    <header>
+      <div>
+        <p>Save contact</p>
+        <h2 id="home-save-title">{{ displayPhone(target.number) }}</h2>
+      </div>
+      <button type="button" aria-label="Close save options" (click)="closeSaveChoice()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <p id="home-save-message" class="entity-action-message">
+      Create a new private contact, or add this number to an existing contact.
+    </p>
+    <div class="entity-action-grid">
+      <button type="button" (click)="saveAsNewContact()">
+        <app-icon name="user-plus" /><span
+          ><strong>New contact</strong><small>Create a new entry</small></span
+        >
+      </button>
+      <button type="button" (click)="chooseExistingContact()">
+        <app-icon name="contacts" /><span
+          ><strong>Existing contact</strong><small>Add this number</small></span
+        >
+      </button>
+    </div>
+  </section>
+}
+
+@if (contactPickerTarget(); as target) {
+  <button
+    class="modal-scrim entity-scrim"
+    type="button"
+    aria-label="Close contact chooser"
+    (click)="closeContactPicker()"
+  ></button>
+  <section
+    class="contact-picker-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="home-picker-title"
+  >
+    <header>
+      <div>
+        <p>Add {{ displayPhone(target.number) }} to</p>
+        <h2 id="home-picker-title">Choose a contact</h2>
+      </div>
+      <button type="button" aria-label="Close contact chooser" (click)="closeContactPicker()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <label class="picker-search">
+      <app-icon name="search" />
+      <input
+        #pickerQuery
+        type="search"
+        placeholder="Search name or number"
+        [value]="contactPickerSearch()"
+        (input)="contactPickerSearch.set(pickerQuery.value)"
+      />
+    </label>
+    @if (contactPickerResults().length) {
+      <ul class="picker-list">
+        @for (contact of contactPickerResults(); track contact.id) {
+          <li>
+            <button type="button" (click)="appendNumberToContact(contact)">
+              <span class="picker-avatar" aria-hidden="true">{{
+                contact.name.slice(0, 1).toUpperCase()
+              }}</span>
+              <span class="picker-copy">
+                <strong>{{ contact.name }}</strong>
+                <small>{{ contact.company || displayPhone(contact.normalizedPhone) }}</small>
+              </span>
+              <app-icon name="chevron" />
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="picker-empty">No contacts match your search.</p>
+    }
+  </section>
+}
