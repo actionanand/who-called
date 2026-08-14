@@ -1,7 +1,13 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { DeviceCallHistoryEntry, PrivateContact, TaggedNumber } from '../../core/models/app.models';
+import {
+  ContactPhone,
+  DeviceCallHistoryEntry,
+  PrivateContact,
+  TaggedNumber,
+} from '../../core/models/app.models';
+import { SORTED_COUNTRY_CODES } from '../../core/data/country-codes';
 import { CallService } from '../../core/services/call.service';
 import { AppStore } from '../../core/services/app-store.service';
 import {
@@ -9,7 +15,8 @@ import {
   WhatsAppPackage,
 } from '../../core/services/native-integration.service';
 import { contactDisplayName } from '../../core/utils/contact-privacy';
-import { digitsOnly } from '../../core/utils/phone-number';
+import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
+import { FeedbackService } from '../../core/services/feedback.service';
 import { environment } from '../../../environments/environment';
 import { AppIcon } from '../../shared/components/app-icon';
 import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
@@ -19,6 +26,10 @@ interface HomeCallHistoryEntry extends DeviceCallHistoryEntry {
   readonly taggedNumber?: TaggedNumber;
   readonly displayName: string;
 }
+
+const CALLING_CODES_BY_LENGTH = [
+  ...new Set(SORTED_COUNTRY_CODES.map((country) => country.callingCode)),
+].sort((left, right) => right.length - left.length);
 
 @Component({
   selector: 'app-home',
@@ -32,6 +43,7 @@ export class Home {
   private readonly router = inject(Router);
   private readonly calls = inject(CallService);
   private readonly document = inject(DOCUMENT);
+  private readonly feedback = inject(FeedbackService);
   protected readonly callHistory = signal<readonly DeviceCallHistoryEntry[]>([]);
   protected readonly callHistoryLoading = signal(false);
   protected readonly callHistoryError = signal('');
@@ -44,6 +56,22 @@ export class Home {
     readonly number: string;
     readonly packages: readonly WhatsAppPackage[];
   } | null>(null);
+  protected readonly saveTarget = signal<HomeCallHistoryEntry | null>(null);
+  protected readonly contactPickerTarget = signal<HomeCallHistoryEntry | null>(null);
+  protected readonly contactPickerSearch = signal('');
+  protected readonly contactPickerResults = computed<readonly PrivateContact[]>(() => {
+    const query = this.contactPickerSearch().trim().toLocaleLowerCase();
+    const contacts = this.store.activeContacts();
+    if (!query) return contacts;
+    const phoneQuery = digitsOnly(query);
+    return contacts.filter((contact) => {
+      const numbers = this.contactNumbers(contact).join(' ');
+      const copy = `${contact.name} ${contact.company} ${numbers}`.toLocaleLowerCase();
+      return (
+        copy.includes(query) || (phoneQuery.length > 0 && digitsOnly(numbers).includes(phoneQuery))
+      );
+    });
+  });
   private callHistoryRequested = false;
 
   protected readonly enrichedCallHistory = computed<readonly HomeCallHistoryEntry[]>(() =>
@@ -107,12 +135,95 @@ export class Home {
   }
 
   protected saveAsContact(call: HomeCallHistoryEntry): void {
+    this.saveTarget.set(call);
+  }
+
+  protected closeSaveChoice(): void {
+    this.saveTarget.set(null);
+  }
+
+  protected saveAsNewContact(): void {
+    const call = this.saveTarget();
+    if (!call) return;
+    this.saveTarget.set(null);
     this.store.pendingContactDraft.set({
       phone: call.number,
       note: call.taggedNumber?.note ?? '',
       tag: call.taggedNumber?.tag ?? '',
     });
     void this.router.navigate(['/contacts'], { queryParams: { add: 1 } });
+  }
+
+  protected chooseExistingContact(): void {
+    const call = this.saveTarget();
+    if (!call) return;
+    this.saveTarget.set(null);
+    this.contactPickerSearch.set('');
+    this.contactPickerTarget.set(call);
+  }
+
+  protected closeContactPicker(): void {
+    this.contactPickerTarget.set(null);
+  }
+
+  protected async appendNumberToContact(contact: PrivateContact): Promise<void> {
+    const call = this.contactPickerTarget();
+    if (!call) return;
+    const normalized = digitsOnly(call.number)
+      ? call.number.trim().startsWith('+')
+        ? `+${digitsOnly(call.number)}`
+        : normalizePhone(this.store.settings().defaultCallingCode, call.number)
+      : '';
+    if (!normalized) {
+      this.feedback.notify('This call has no dialable number to save');
+      return;
+    }
+    const existingPhones = this.contactPhones(contact);
+    if (existingPhones.some((phone) => phone.normalizedNumber === normalized)) {
+      this.contactPickerTarget.set(null);
+      this.feedback.notify(`${contactDisplayName(contact)} already has this number`);
+      return;
+    }
+    const callingCode =
+      CALLING_CODES_BY_LENGTH.find((code) => normalized.startsWith(code)) ??
+      this.store.settings().defaultCallingCode;
+    const newPhone: ContactPhone = {
+      id: crypto.randomUUID(),
+      type: 'Mobile',
+      callingCode,
+      number: normalized.startsWith(callingCode)
+        ? normalized.slice(callingCode.length)
+        : digitsOnly(normalized),
+      normalizedNumber: normalized,
+      whatsappEnabled: true,
+    };
+    const updated: PrivateContact = {
+      ...contact,
+      phones: [...existingPhones, newPhone],
+      updatedAt: new Date().toISOString(),
+    };
+    this.contactPickerTarget.set(null);
+    try {
+      await this.store.updateContact(updated);
+      this.feedback.notify(`Number added to ${contactDisplayName(contact)}`);
+    } catch {
+      this.feedback.notify('The number could not be saved to this contact');
+    }
+  }
+
+  private contactPhones(contact: PrivateContact): readonly ContactPhone[] {
+    return contact.phones?.length
+      ? contact.phones
+      : [
+          {
+            id: crypto.randomUUID(),
+            type: 'Mobile',
+            callingCode: this.store.settings().defaultCallingCode,
+            number: contact.phone,
+            normalizedNumber: contact.normalizedPhone || contact.phone,
+            whatsappEnabled: contact.whatsappEnabled,
+          },
+        ];
   }
 
   protected tagCall(call: HomeCallHistoryEntry): void {
