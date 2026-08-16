@@ -20,6 +20,8 @@
         [value]="form.controls.country.value"
         [options]="countryOptions"
         sheetTitle="Country or territory"
+        [searchable]="true"
+        searchPlaceholder="Search countries or codes"
         (valueChange)="selectCountry($event)"
       />
     </div>
