@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AppStore } from '../../core/services/app-store.service';
 import { FeedbackService } from '../../core/services/feedback.service';
-import { SORTED_COUNTRY_CODES } from '../../core/data/country-codes';
+import { countryNameForCallingCode, SORTED_COUNTRY_CODES } from '../../core/data/country-codes';
 import {
   NativeIntegrationService,
   WhatsAppPackage,
@@ -64,18 +64,8 @@ export class WhatsApp {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((callingCode) => {
         const normalized = callingCode.startsWith('+') ? callingCode : `+${callingCode}`;
-        const selected = SORTED_COUNTRY_CODES.find(
-          (country) => country.name === this.form.controls.country.value,
-        );
-        if (selected?.callingCode === normalized) return;
-        const matches = SORTED_COUNTRY_CODES.filter(
-          (country) => country.callingCode === normalized,
-        );
-        const match =
-          matches.find((country) => country.iso === 'US') ??
-          matches.find((country) => country.iso === 'RU') ??
-          matches[0];
-        this.form.controls.country.setValue(match?.name ?? 'Custom calling code', {
+        const country = countryNameForCallingCode(normalized, this.form.controls.country.value);
+        this.form.controls.country.setValue(country, {
           emitEvent: false,
         });
       });
