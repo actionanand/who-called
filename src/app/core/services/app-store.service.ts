@@ -43,6 +43,7 @@ export class AppStore {
   readonly pendingSharedText = signal('');
   readonly pendingContactDraft = signal<{
     readonly taggedNumberId?: string;
+    readonly removeFromTaggedList?: boolean;
     readonly callingCode?: string;
     readonly phone: string;
     readonly note: string;

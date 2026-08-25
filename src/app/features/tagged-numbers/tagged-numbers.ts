@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TaggedNumber } from '../../core/models/app.models';
+import { NUMBER_TAGS } from '../../core/data/number-tags';
 import { CallService } from '../../core/services/call.service';
 import { AppStore } from '../../core/services/app-store.service';
 import { FeedbackService } from '../../core/services/feedback.service';
@@ -15,23 +16,6 @@ import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
 import { AppIcon } from '../../shared/components/app-icon';
 import { SelectPicker, SelectPickerOption } from '../../shared/components/select-picker';
 import { WhatsAppAppChooser } from '../../shared/components/whatsapp-app-chooser';
-
-const DEFAULT_TAGS = [
-  'Fraud',
-  'Spam',
-  'Repeated Call',
-  'Sales',
-  'Marketing',
-  'Delivery',
-  'Courier',
-  'Service Centre',
-  'Bank',
-  'Recruitment',
-  'Business',
-  'Important',
-  'Unknown',
-  'Other',
-] as const;
 
 @Component({
   selector: 'app-tagged-numbers',
@@ -59,7 +43,7 @@ export class TaggedNumbers {
   protected readonly search = signal('');
   protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
   protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
-  protected readonly tagOptions: readonly SelectPickerOption[] = DEFAULT_TAGS.map((value) => ({
+  protected readonly tagOptions: readonly SelectPickerOption[] = NUMBER_TAGS.map((value) => ({
     value,
     label: value,
   }));
@@ -145,6 +129,7 @@ export class TaggedNumbers {
   protected convertToContact(number: TaggedNumber): void {
     this.store.pendingContactDraft.set({
       taggedNumberId: number.id,
+      removeFromTaggedList: true,
       phone: number.phone,
       note: number.note,
       tag: number.tag,
