@@ -11,6 +11,7 @@ import {
   PrivateContact,
 } from '../../core/models/app.models';
 import { AppStore } from '../../core/services/app-store.service';
+import { CONTACT_TO_TAG_DEFAULT, NUMBER_TAGS } from '../../core/data/number-tags';
 import { CallService } from '../../core/services/call.service';
 import { FeedbackService } from '../../core/services/feedback.service';
 import { KeepsakeReminderService } from '../../core/services/keepsake-reminder.service';
@@ -93,6 +94,9 @@ export class Contacts {
   protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
   protected readonly trashView = signal(false);
   protected readonly contactFilter = signal<ContactFilter>('all');
+  protected readonly deleteTarget = signal<PrivateContact | null>(null);
+  protected readonly tagBeforeTrashTarget = signal<PrivateContact | null>(null);
+  protected readonly taggingBeforeTrash = signal(false);
   private readonly requestedEditId = signal('');
   protected readonly selectionMode = computed(() => this.selectedIds().size > 0);
   protected readonly selectedContacts = computed(() => {
@@ -109,6 +113,10 @@ export class Contacts {
   protected readonly emailTypes = EMAIL_TYPES;
   protected readonly socialTypes = SOCIAL_TYPES;
   protected readonly dobModes = DOB_MODES;
+  protected readonly tagOptions: readonly SelectPickerOption[] = NUMBER_TAGS.map((value) => ({
+    value,
+    label: value,
+  }));
 
   protected readonly filteredContacts = computed(() => {
     let contacts = this.trashView() ? this.store.trashedContacts() : this.store.visibleContacts();
@@ -163,6 +171,11 @@ export class Contacts {
     dobDay: 1,
     dobFull: '',
     birthdayReminder: false,
+    removeFromTaggedList: true,
+  });
+  protected readonly tagBeforeTrashForm = this.formBuilder.nonNullable.group({
+    tag: [CONTACT_TO_TAG_DEFAULT, Validators.required],
+    note: ['', Validators.maxLength(1000)],
   });
 
   constructor() {
@@ -255,6 +268,7 @@ export class Contacts {
           ? `${birthDate.year}-${String(birthDate.month).padStart(2, '0')}-${String(birthDate.day).padStart(2, '0')}`
           : '',
       birthdayReminder: birthDate?.reminderEnabled ?? false,
+      removeFromTaggedList: draft?.removeFromTaggedList ?? true,
     });
     this.editorOpen.set(true);
     if (draft) {
@@ -336,6 +350,7 @@ export class Contacts {
       return;
     }
     this.saving.set(true);
+    let tagCleanupFailed = false;
     try {
       const phones: readonly ContactPhone[] = usablePhones.map((phone) => ({
         id: phone.id || crypto.randomUUID(),
@@ -423,13 +438,23 @@ export class Contacts {
       else {
         await this.store.addContact(contact);
         const draft = this.store.pendingContactDraft();
-        if (draft?.taggedNumberId) {
-          await this.store.removeTaggedNumber(draft.taggedNumberId);
+        if (draft?.taggedNumberId && value.removeFromTaggedList) {
+          try {
+            await this.store.removeTaggedNumber(draft.taggedNumberId);
+          } catch {
+            tagCleanupFailed = true;
+          }
         }
         this.store.pendingContactDraft.set(null);
       }
       this.closeEditor();
-      this.feedback.notify(existing ? 'Contact updated' : 'Contact saved');
+      this.feedback.notify(
+        tagCleanupFailed
+          ? 'Contact saved, but the tagged number could not be removed'
+          : existing
+            ? 'Contact updated'
+            : 'Contact saved',
+      );
     } catch {
       this.feedback.notify('Contact could not be saved. Please try again');
     } finally {
@@ -484,6 +509,11 @@ export class Contacts {
     const contacts = this.selectedContacts();
     if (!contacts.length) return;
     const permanently = this.trashView();
+    if (!permanently && contacts.length === 1) {
+      this.clearSelection();
+      this.deleteTarget.set(contacts[0]);
+      return;
+    }
     const confirmed = await this.feedback.confirm({
       title: permanently
         ? contacts.length === 1
@@ -629,6 +659,10 @@ export class Contacts {
   protected async deleteContact(contact: PrivateContact): Promise<void> {
     this.closeContactDetails();
     const permanently = this.trashView();
+    if (!permanently) {
+      this.deleteTarget.set(contact);
+      return;
+    }
     const confirmed = await this.feedback.confirm({
       title: permanently ? 'Delete contact permanently?' : 'Move contact to Trash?',
       message: permanently
@@ -642,6 +676,134 @@ export class Contacts {
     this.feedback.notify(
       permanently ? `${contact.name} permanently deleted` : `${contact.name} moved to Trash`,
     );
+  }
+
+  protected closeDeleteChoice(): void {
+    this.deleteTarget.set(null);
+  }
+
+  protected async moveDeleteTargetToTrash(): Promise<void> {
+    const contact = this.deleteTarget();
+    if (!contact) return;
+    this.deleteTarget.set(null);
+    await this.store.trashContact(contact.id);
+    this.feedback.notify(`${contact.name} moved to Trash`);
+  }
+
+  protected prepareTagBeforeTrash(): void {
+    const contact = this.deleteTarget();
+    if (!contact) return;
+    this.deleteTarget.set(null);
+    this.tagBeforeTrashForm.reset({
+      tag: CONTACT_TO_TAG_DEFAULT,
+      note: this.contactTagNote(contact),
+    });
+    this.tagBeforeTrashTarget.set(contact);
+  }
+
+  protected closeTagBeforeTrash(): void {
+    if (this.taggingBeforeTrash()) return;
+    this.tagBeforeTrashTarget.set(null);
+  }
+
+  protected async tagContactAndMoveToTrash(): Promise<void> {
+    const contact = this.tagBeforeTrashTarget();
+    if (!contact || this.tagBeforeTrashForm.invalid) {
+      this.tagBeforeTrashForm.markAllAsTouched();
+      return;
+    }
+    const phones = this.uniqueContactPhones(contact);
+    if (!phones.length) {
+      this.feedback.notify('This contact has no valid numbers to tag');
+      return;
+    }
+    this.taggingBeforeTrash.set(true);
+    try {
+      const value = this.tagBeforeTrashForm.getRawValue();
+      const now = new Date().toISOString();
+      for (const phone of phones) {
+        const normalizedPhone =
+          phone.normalizedNumber || normalizePhone(phone.callingCode, phone.number);
+        const existing = this.store
+          .taggedNumbers()
+          .find(
+            (number) => this.phoneKey(number.normalizedPhone) === this.phoneKey(normalizedPhone),
+          );
+        const previousNote = existing?.note.trim();
+        const note = [value.note.trim(), previousNote ? `Previous tag note: ${previousNote}` : '']
+          .filter(Boolean)
+          .join('\n')
+          .slice(0, 1000);
+        const taggedNumber = {
+          id: existing?.id ?? crypto.randomUUID(),
+          phone: digitsOnly(phone.number) || digitsOnly(normalizedPhone),
+          normalizedPhone,
+          name: contact.name,
+          tag: value.tag,
+          note,
+          important: contact.favorite || (existing?.important ?? false),
+          appearanceCount: existing?.appearanceCount ?? 1,
+          lastSeenAt: existing?.lastSeenAt ?? now,
+          createdAt: existing?.createdAt ?? now,
+        };
+        if (existing) await this.store.updateTaggedNumber(taggedNumber);
+        else await this.store.addTaggedNumber(taggedNumber);
+      }
+      await this.store.trashContact(contact.id);
+      this.tagBeforeTrashTarget.set(null);
+      this.feedback.notify(
+        `${phones.length} number${phones.length === 1 ? '' : 's'} tagged; ${contact.name} moved to Trash`,
+      );
+    } catch {
+      this.feedback.notify('The contact could not be converted to tagged numbers');
+    } finally {
+      this.taggingBeforeTrash.set(false);
+    }
+  }
+
+  private uniqueContactPhones(contact: PrivateContact): readonly ContactPhone[] {
+    const unique = new Map<string, ContactPhone>();
+    for (const phone of this.contactPhones(contact)) {
+      const normalized = phone.normalizedNumber || normalizePhone(phone.callingCode, phone.number);
+      const key = this.phoneKey(normalized);
+      if (key && !unique.has(key)) unique.set(key, phone);
+    }
+    return [...unique.values()];
+  }
+
+  private contactTagNote(contact: PrivateContact): string {
+    const phones = this.contactPhones(contact)
+      .map((phone) => `${phone.type}: ${this.phoneLabel(phone)}`)
+      .join(', ');
+    const emails = (contact.emails ?? [])
+      .map((email) => `${email.type}: ${email.value}`)
+      .join(', ');
+    const links = (contact.socialLinks ?? [])
+      .map((link) => `${link.platform}: ${link.url}`)
+      .join(', ');
+    const anniversaries = (contact.anniversaries ?? [])
+      .map(
+        (anniversary) =>
+          `${anniversary.name}: ${anniversary.day}/${anniversary.month}${anniversary.year ? `/${anniversary.year}` : ''}`,
+      )
+      .join(', ');
+    return [
+      `Former contact: ${contact.name}`,
+      contact.company ? `Company: ${contact.company}` : '',
+      phones ? `Numbers: ${phones}` : '',
+      emails ? `Emails: ${emails}` : '',
+      links ? `Links: ${links}` : '',
+      contact.birthDate ? `Birthday: ${this.birthdayLabel(contact)}` : '',
+      anniversaries ? `Anniversaries: ${anniversaries}` : '',
+      contact.notes ? `Notes: ${contact.notes}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 1000);
+  }
+
+  private phoneKey(number: string): string {
+    return digitsOnly(number).slice(-10);
   }
 
   protected contactPhones(contact: PrivateContact): readonly ContactPhone[] {

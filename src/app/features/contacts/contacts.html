@@ -570,6 +570,16 @@
         ></textarea>
       </div>
 
+      @if (!editingContact() && store.pendingContactDraft()?.taggedNumberId) {
+        <label class="toggle-row tagged-cleanup-choice">
+          <span>
+            <strong>Remove from tagged list</strong>
+            <small>Recommended after saving this number as a contact</small>
+          </span>
+          <input type="checkbox" formControlName="removeFromTaggedList" />
+        </label>
+      }
+
       <div class="form-actions">
         <button class="secondary-button" type="button" (click)="closeEditor()">Cancel</button>
         <button class="primary-button" type="submit" [disabled]="saving()">
@@ -760,5 +770,123 @@
         </div>
       }
     </div>
+  </section>
+}
+
+@if (deleteTarget(); as contact) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Cancel contact deletion"
+    (click)="closeDeleteChoice()"
+  ></button>
+  <section
+    class="choice-sheet deletion-choice-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="contact-delete-choice-title"
+    aria-describedby="contact-delete-choice-message"
+  >
+    <header>
+      <div>
+        <p>Before deleting</p>
+        <h2 id="contact-delete-choice-title">What should happen to {{ contact.name }}?</h2>
+      </div>
+      <button type="button" aria-label="Cancel deletion" (click)="closeDeleteChoice()">
+        <app-icon name="close" />
+      </button>
+    </header>
+    <p id="contact-delete-choice-message" class="deletion-choice-message">
+      You can move the contact to Trash for 30 days, or first preserve every phone number as a
+      tagged number.
+    </p>
+    <div class="delete-choice-list">
+      <button type="button" (click)="prepareTagBeforeTrash()">
+        <span class="delete-choice-icon tag-choice"><app-icon name="tag" /></span>
+        <span>
+          <strong>Tag numbers, then delete</strong>
+          <small>Copy contact details into the tag notes</small>
+        </span>
+        <app-icon name="chevron" />
+      </button>
+      <button type="button" (click)="moveDeleteTargetToTrash()">
+        <span class="delete-choice-icon trash-choice"><app-icon name="trash" /></span>
+        <span>
+          <strong>Move directly to Trash</strong>
+          <small>Do not create or update any tagged numbers</small>
+        </span>
+        <app-icon name="chevron" />
+      </button>
+    </div>
+    <button class="secondary-button" type="button" (click)="closeDeleteChoice()">Cancel</button>
+  </section>
+}
+
+@if (tagBeforeTrashTarget(); as contact) {
+  <button
+    class="modal-scrim"
+    type="button"
+    aria-label="Cancel tagging contact numbers"
+    (click)="closeTagBeforeTrash()"
+  ></button>
+  <section
+    class="tag-before-trash-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="tag-before-trash-title"
+    [attr.aria-busy]="taggingBeforeTrash()"
+  >
+    <header>
+      <div>
+        <p>Preserve before deleting</p>
+        <h2 id="tag-before-trash-title">Tag {{ contact.name }}’s numbers</h2>
+      </div>
+      <button
+        type="button"
+        aria-label="Cancel tagging"
+        [disabled]="taggingBeforeTrash()"
+        (click)="closeTagBeforeTrash()"
+      >
+        <app-icon name="close" />
+      </button>
+    </header>
+    <div class="numbers-to-tag" aria-label="Phone numbers that will be tagged">
+      @for (phone of contactPhones(contact); track phone.id) {
+        <span><app-icon name="phone" /> {{ phone.type }} · {{ phoneLabel(phone) }}</span>
+      }
+    </div>
+    <form [formGroup]="tagBeforeTrashForm" (ngSubmit)="tagContactAndMoveToTrash()">
+      <div class="field">
+        <span class="field-label">Use the same tag for every number</span>
+        <app-select-picker
+          [value]="tagBeforeTrashForm.controls.tag.value"
+          [options]="tagOptions"
+          sheetTitle="Number tag"
+          (valueChange)="setPickerValue(tagBeforeTrashForm.controls.tag, $event)"
+        />
+      </div>
+      <div class="field">
+        <label for="contact-tag-note">Short note copied to every tag</label>
+        <textarea id="contact-tag-note" formControlName="note" maxlength="1000"></textarea>
+        <small>
+          Phone numbers, email addresses, links, dates, company and private notes are included when
+          available.
+        </small>
+      </div>
+      <div class="form-actions">
+        <button
+          class="secondary-button"
+          type="button"
+          [disabled]="taggingBeforeTrash()"
+          (click)="closeTagBeforeTrash()"
+        >
+          Cancel
+        </button>
+        <button class="primary-button" type="submit" [disabled]="taggingBeforeTrash()">
+          <app-icon name="tag" />
+          {{ taggingBeforeTrash() ? 'Saving tags…' : 'Tag & move to Trash' }}
+        </button>
+      </div>
+    </form>
   </section>
 }

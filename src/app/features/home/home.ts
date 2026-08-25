@@ -15,7 +15,7 @@ import {
   WhatsAppPackage,
 } from '../../core/services/native-integration.service';
 import { contactDisplayName } from '../../core/utils/contact-privacy';
-import { digitsOnly, normalizePhone } from '../../core/utils/phone-number';
+import { digitsOnly, formatIndianPhone, normalizePhone } from '../../core/utils/phone-number';
 import { FeedbackService } from '../../core/services/feedback.service';
 import { environment } from '../../../environments/environment';
 import { AppIcon } from '../../shared/components/app-icon';
@@ -28,7 +28,9 @@ interface HomeCallHistoryEntry extends DeviceCallHistoryEntry {
 }
 
 const CALLING_CODES_BY_LENGTH = [
-  ...new Set(SORTED_COUNTRY_CODES.map((country) => country.callingCode)),
+  ...new Set(
+    SORTED_COUNTRY_CODES.map((country) => country.callingCode).filter((code) => code.length > 0),
+  ),
 ].sort((left, right) => right.length - left.length);
 
 @Component({
@@ -57,7 +59,10 @@ export class Home {
     readonly packages: readonly WhatsAppPackage[];
   } | null>(null);
   protected readonly saveTarget = signal<HomeCallHistoryEntry | null>(null);
+  protected readonly removeTagOnSave = signal(true);
   protected readonly contactPickerTarget = signal<HomeCallHistoryEntry | null>(null);
+  protected readonly selectedContact = signal<PrivateContact | null>(null);
+  protected readonly selectedTaggedNumber = signal<TaggedNumber | null>(null);
   protected readonly contactPickerSearch = signal('');
   protected readonly contactPickerResults = computed<readonly PrivateContact[]>(() => {
     const query = this.contactPickerSearch().trim().toLocaleLowerCase();
@@ -135,6 +140,7 @@ export class Home {
   }
 
   protected saveAsContact(call: HomeCallHistoryEntry): void {
+    this.removeTagOnSave.set(true);
     this.saveTarget.set(call);
   }
 
@@ -146,8 +152,12 @@ export class Home {
     const call = this.saveTarget();
     if (!call) return;
     this.saveTarget.set(null);
+    const draftPhone = this.contactDraftPhone(call.number);
     this.store.pendingContactDraft.set({
-      phone: call.number,
+      taggedNumberId: call.taggedNumber?.id,
+      removeFromTaggedList: this.removeTagOnSave(),
+      callingCode: draftPhone.callingCode,
+      phone: draftPhone.phone,
       note: call.taggedNumber?.note ?? '',
       tag: call.taggedNumber?.tag ?? '',
     });
@@ -181,7 +191,18 @@ export class Home {
     const existingPhones = this.contactPhones(contact);
     if (existingPhones.some((phone) => phone.normalizedNumber === normalized)) {
       this.contactPickerTarget.set(null);
-      this.feedback.notify(`${contactDisplayName(contact)} already has this number`);
+      if (call.taggedNumber && this.removeTagOnSave()) {
+        try {
+          await this.store.removeTaggedNumber(call.taggedNumber.id);
+          this.feedback.notify(
+            `Tag removed; ${contactDisplayName(contact)} already has this number`,
+          );
+        } catch {
+          this.feedback.notify(`${contactDisplayName(contact)} has this number; the tag was kept`);
+        }
+      } else {
+        this.feedback.notify(`${contactDisplayName(contact)} already has this number`);
+      }
       return;
     }
     const callingCode =
@@ -205,18 +226,29 @@ export class Home {
     this.contactPickerTarget.set(null);
     try {
       await this.store.updateContact(updated);
-      this.feedback.notify(`Number added to ${contactDisplayName(contact)}`);
     } catch {
       this.feedback.notify('The number could not be saved to this contact');
+      return;
     }
+    if (call.taggedNumber && this.removeTagOnSave()) {
+      try {
+        await this.store.removeTaggedNumber(call.taggedNumber.id);
+      } catch {
+        this.feedback.notify(
+          `Number added to ${contactDisplayName(contact)}, but the tag could not be removed`,
+        );
+        return;
+      }
+    }
+    this.feedback.notify(`Number added to ${contactDisplayName(contact)}`);
   }
 
-  private contactPhones(contact: PrivateContact): readonly ContactPhone[] {
+  protected contactPhones(contact: PrivateContact): readonly ContactPhone[] {
     return contact.phones?.length
       ? contact.phones
       : [
           {
-            id: crypto.randomUUID(),
+            id: contact.id,
             type: 'Mobile',
             callingCode: this.store.settings().defaultCallingCode,
             number: contact.phone,
@@ -229,6 +261,50 @@ export class Home {
   protected tagCall(call: HomeCallHistoryEntry): void {
     this.store.pendingTaggedNumber.set(call.number);
     void this.router.navigate(['/tagged'], { queryParams: { add: 1 } });
+  }
+
+  protected openContactDetails(contact: PrivateContact): void {
+    this.selectedContact.set(contact);
+  }
+
+  protected closeContactDetails(): void {
+    this.selectedContact.set(null);
+  }
+
+  protected openTaggedDetails(taggedNumber: TaggedNumber): void {
+    this.selectedTaggedNumber.set(taggedNumber);
+  }
+
+  protected closeTaggedDetails(): void {
+    this.selectedTaggedNumber.set(null);
+  }
+
+  protected callContactPhone(contact: PrivateContact, phone: ContactPhone): void {
+    this.closeContactDetails();
+    this.phoneAction.set({
+      display: `${contactDisplayName(contact)} · ${phone.type}`,
+      number: phone.normalizedNumber || normalizePhone(phone.callingCode, phone.number),
+    });
+  }
+
+  protected whatsappContactPhone(phone: ContactPhone): void {
+    this.closeContactDetails();
+    this.openWhatsAppNumber(
+      phone.normalizedNumber || normalizePhone(phone.callingCode, phone.number),
+    );
+  }
+
+  protected callTaggedNumber(taggedNumber: TaggedNumber): void {
+    this.closeTaggedDetails();
+    this.phoneAction.set({
+      display: taggedNumber.name || taggedNumber.tag,
+      number: taggedNumber.normalizedPhone,
+    });
+  }
+
+  protected whatsappTaggedNumber(taggedNumber: TaggedNumber): void {
+    this.closeTaggedDetails();
+    this.openWhatsAppNumber(taggedNumber.normalizedPhone);
   }
 
   protected callFromHistory(call: HomeCallHistoryEntry): void {
@@ -252,8 +328,14 @@ export class Home {
     if (!action) return;
     const number = digitsOnly(action.number);
     if (!number) return;
-    const packages = this.native.availableWhatsAppApps();
     this.phoneAction.set(null);
+    this.openWhatsAppNumber(number);
+  }
+
+  private openWhatsAppNumber(phone: string): void {
+    const number = digitsOnly(phone);
+    if (!number) return;
+    const packages = this.native.availableWhatsAppApps();
     if (packages.length > 1) {
       this.whatsappChoice.set({ number, packages });
       return;
@@ -318,8 +400,66 @@ export class Home {
     return digitsOnly(number).length >= 6;
   }
 
+  protected contactPhoneLabel(phone: ContactPhone): string {
+    return `${phone.callingCode} ${formatIndianPhone(phone.number)}`.trim();
+  }
+
+  protected displayContactName(contact: PrivateContact): string {
+    return contactDisplayName(contact);
+  }
+
+  protected birthdayLabel(contact: PrivateContact): string {
+    const birthDate = contact.birthDate;
+    if (!birthDate) return '';
+    const day = String(birthDate.day).padStart(2, '0');
+    const month = String(birthDate.month).padStart(2, '0');
+    return birthDate.mode === 'full' && birthDate.year
+      ? `${day}/${month}/${birthDate.year}`
+      : `${day}/${month}`;
+  }
+
+  protected birthdayDetail(contact: PrivateContact): string {
+    const birthDate = contact.birthDate;
+    if (birthDate?.mode !== 'full' || !birthDate.year) return 'Month and date saved';
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.year;
+    if (
+      today.getMonth() + 1 < birthDate.month ||
+      (today.getMonth() + 1 === birthDate.month && today.getDate() < birthDate.day)
+    ) {
+      age -= 1;
+    }
+    return `${Math.max(0, age)} years old`;
+  }
+
+  protected formatDate(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Unknown date';
+    return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(
+      date,
+    );
+  }
+
   private phoneKey(number: string): string {
     return digitsOnly(number).slice(-10);
+  }
+
+  private contactDraftPhone(number: string): {
+    readonly callingCode: string;
+    readonly phone: string;
+  } {
+    const normalized = number.trim().startsWith('+')
+      ? `+${digitsOnly(number)}`
+      : normalizePhone(this.store.settings().defaultCallingCode, number);
+    const callingCode =
+      CALLING_CODES_BY_LENGTH.find((code) => normalized.startsWith(code)) ??
+      this.store.settings().defaultCallingCode;
+    return {
+      callingCode,
+      phone: normalized.startsWith(callingCode)
+        ? normalized.slice(callingCode.length)
+        : digitsOnly(number),
+    };
   }
 
   private contactNumbers(contact: PrivateContact): readonly string[] {
