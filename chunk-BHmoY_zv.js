@@ -1,0 +1,1 @@
+var e=["Former Contact","Fraud","Spam","Repeated Call","Sales","Marketing","Delivery","Courier","Service Centre","Bank","Recruitment","Business","Important","Unknown","Other"],t=e[0];export{e,t};
