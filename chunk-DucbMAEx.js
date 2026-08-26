@@ -1,0 +1,1 @@
+import {S,A as qe,aj as g_,ak as ee}from'./main-MRLT67FZ.js';function w(t){t||(t=S(qe));let i=new ee(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(g_(i))}export{w};
