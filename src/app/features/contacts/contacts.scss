@@ -940,6 +940,12 @@
 }
 
 @media (max-width: 719px) {
+  .filter-row {
+    margin-top: 0.55rem;
+    margin-bottom: 0.85rem;
+    padding-block: 0.35rem;
+  }
+
   .filter-row .favourites-filter,
   .filter-row .trash-filter {
     width: 3rem;
